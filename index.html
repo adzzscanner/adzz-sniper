@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Adzz Sniper</title>
+<style>
+* { box-sizing: border-box; }
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace; 
+  background: #0f0f1b; 
+  color: #0af; 
+  padding: 8px; 
+  line-height: 1.4; 
+  margin: 0; 
+  overflow-x: hidden;
+}
+h1 { 
+  color: #0f0; 
+  text-align: center; 
+  font-size: 1.2em; 
+  margin: 6px 0; 
+  padding: 0 4px;
+}
+.container { 
+  max-width: 100%; 
+  margin: 0 auto; 
+  padding: 0 2px;
+}
+.section { 
+  background: #16213e; 
+  padding: 8px; 
+  margin: 8px 0; 
+  border-radius: 6px; 
+  font-size: 0.9em; 
+  overflow: hidden;
+}
+.chaos   { border-left: 3px solid #ff5555; }
+.flash   { border-left: 3px solid #ffaa00; }
+.normal  { border-left: 3px solid #0f0; }
+.coin-row { 
+  padding: 8px; 
+  margin: 4px 0; 
+  background: #0d0d1a; 
+  border-radius: 5px; 
+  font-size: 1.1em; 
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+.tp-levels { font-size: 1em; color: #88f; margin-top: 3px; }
+.tp-main { color: #0f0; font-weight: bold; }
+.high-conviction { color: #ffff00; font-weight: bold; }
+.volatility-score { font-size: 0.8em; color: #aaa; margin-top: 3px; }
+.status { 
+  color: #ffaa00; 
+  padding: 6px; 
+  background: #1a1a2e; 
+  border-radius: 4px; 
+  font-size: 1em; 
+  text-align: center; 
+  margin: 8px 0; 
+  line-height: 1.3;
+}
+.status-danger { color: #ff5555 !important; font-weight: bold; }
+.button-container { text-align: center; margin: 12px 0; }
+button { 
+  padding: 10px 20px; 
+  background: #0f0; 
+  color: #000; 
+  border: none; 
+  font-weight: bold; 
+  border-radius: 6px; 
+  font-size: 1em; 
+  cursor: pointer; 
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+}
+.toggle-container { 
+  text-align: center; 
+  margin: 8px 0; 
+  font-size: 0.95em;
+}
+.toggle-container label { 
+  color: #0af; 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 6px;
+  padding: 0 4px;
+}
+.toggle-container input { transform: scale(1.2); cursor: pointer; }
+.manual-note { 
+  background: #2a0a3a; 
+  padding: 8px; 
+  border-left: 3px solid #ff55ff; 
+  margin: 12px 0; 
+  font-size: 0.9em; 
+  text-align: center;
+  border-radius: 5px;
+}
+.scanned-list { 
+  background: #0a0a1f; 
+  padding: 6px; 
+  margin: 8px 0; 
+  border-radius: 4px; 
+  font-size: 0.85em; 
+  max-height: 120px; 
+  overflow-y: auto; 
+  word-wrap: break-word;
+  line-height: 1.3;
+}
+.note { font-size: 0.75em; color: #888; margin-top: 3px; }
+.zone-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  font-size: 1em;
+  padding: 0 2px;
+}
+.zone-count { 
+  background: #2a3b5c; 
+  padding: 1px 6px; 
+  border-radius: 10px; 
+  font-size: 0.85em;
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Adzz Sniper — Mobile</h1>
+  <div class="status" id="status">Tap "Scan" to start</div>
+
+  <div class="manual-note">
+    🎯 1-3 HIGH-CONVICTION TRADES/WEEK • MIN 10% TP
+  </div>
+
+  <div class="toggle-container">
+    <label>
+      <input type="checkbox" id="topOnlyToggle" checked>
+      Top Setups Only
+    </label>
+  </div>
+
+  <div class="section chaos">
+    <div class="zone-header">
+      <h3>🔴 CHAOS</h3>
+      <span class="zone-count" id="chaosCount">0</span>
+    </div>
+    <p class="note">30-70% dip • 15% TP</p>
+    <div id="chaosOutput">No setups</div>
+  </div>
+
+  <div class="section flash">
+    <div class="zone-header">
+      <h3>🟠 FLASH</h3>
+      <span class="zone-count" id="flashCount">0</span>
+    </div>
+    <p class="note">10-30% dip • BTC 2-6% • 15% TP</p>
+    <div id="flashOutput">No setups</div>
+  </div>
+
+  <div class="section normal">
+    <div class="zone-header">
+      <h3>🟢 NORMAL</h3>
+      <span class="zone-count" id="normalCount">0</span>
+    </div>
+    <p class="note">5-10% dip • 10% TP</p>
+    <div id="normalOutput">No setups</div>
+  </div>
+
+  <div class="button-container">
+    <button onclick="startScan()">SCAN</button>
+  </div>
+
+  <div class="scanned-list" id="coinListContainer">
+    <strong>Coins:</strong> <span id="coinList">—</span>
+  </div>
+</div>
+
+<script>
+// ✅ MOBILE-OPTIMIZED COIN LISTS
+const APPROVED_NORMAL = [
+  "BTC","ETH","SOL","BNB","XRP","ADA","AVAX","DOT","LINK","LTC",
+  "INJ","TAO","FET","RENDER","SEI","SUI","APT","ARB","OP","NEAR",
+  "UNI","AAVE","COMP","SNX","LDO","MATIC","IMX","ICP","FIL","ATOM",
+  "ALGO","CAKE","ZEC","XLM","ETC","VET","THETA","FLOW"
+];
+
+const FLASH_COINS = [
+  "JUP","PYTH","PIXEL","TNSR","STG",
+  "HOOK","MAGIC","ZRO","PORTAL",
+  "NIL","ONDO","W"
+];
+
+// ✅ ONLY SCAN COINS THAT CAN QUALIFY
+const COINS = [...new Set([...APPROVED_NORMAL, ...FLASH_COINS])];
+
+const BASE_URL = "https://api.binance.com/api/v3";
+
+// 🔒 Fetch with timeout & retry
+async function fetchWithRetry(url, retries = 2, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (e) {
+    clearTimeout(timeout);
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 500));
+      return fetchWithRetry(url, retries - 1, timeoutMs);
+    }
+    return null;
+  }
+}
+
+async function fetchKlines(symbol, interval, limit) {
+  return await fetchWithRetry(`${BASE_URL}/klines?symbol=${symbol}USDT&interval=${interval}&limit=${limit}`);
+}
+
+// 🔒 BTC RANGES
+async function getBTCRange(interval, limit, name) {
+  const klines = await fetchKlines("BTC", interval, limit);
+  if (!klines || klines.length === 0) return 0;
+  const highs = klines.map(k => parseFloat(k[2]));
+  const lows = klines.map(k => parseFloat(k[3]));
+  const high = Math.max(...highs);
+  const low = Math.min(...lows);
+  return ((high - low) / low) * 100;
+}
+
+// 📊 Core logic (unchanged, just faster)
+function calculateVolatilityScore(drop, volSpike, price, mode = 'normal') {
+  let priceMultiplier = 1.0;
+  if (price < 0.5) priceMultiplier = 1.8;
+  else if (price < 1.0) priceMultiplier = 1.5;
+  else if (price < 2.0) priceMultiplier = 1.2;
+  else if (price > 5.0) priceMultiplier = 0.7;
+  const clampedVolSpike = Math.min(volSpike, 3.0);
+  const modeBonus = mode === 'chaos' ? 1.3 : mode === 'flash' ? 1.15 : 1.0;
+  return drop * clampedVolSpike * priceMultiplier * modeBonus;
+}
+
+function getSpeedBadge(score) {
+  if (score >= 80) return ' ⚡';
+  if (score >= 50) return ' ⚡';
+  return '';
+}
+
+function calculateEMA(prices, period) {
+  const k = 2 / (period + 1);
+  let ema = prices[0];
+  for (let i = 1; i < prices.length; i++) {
+    ema = prices[i]*k + ema*(1-k);
+  }
+  return ema;
+}
+
+function isNearLow(lows, price, pct=2) {
+  const minLow = Math.min(...lows);
+  return price <= minLow*(1 + pct/100);
+}
+
+function calculateDrop(highs, currentPrice) {
+  const recentHigh = Math.max(...highs);
+  return recentHigh>0 ? ((recentHigh-currentPrice)/recentHigh)*100 : 0;
+}
+
+function renderCoinRow(data) {
+  const { coin, zone, price, tp, highConv, volatilityScore } = data;
+  const entryLow = (price*0.99).toFixed(4);
+  const entryHigh = (price*1.01).toFixed(4);
+  const icons = { Normal: '🟢', Flash: '🟠', Chaos: '🔴' };
+  const badge = highConv ? ' <span class="high-conviction">🔥</span>' : '';
+  const speedBadge = getSpeedBadge(volatilityScore);
+  return `
+    <div class="coin-row">
+      ${icons[zone]} ${coin}${badge}${speedBadge} — $${price.toFixed(4)}<br>
+      <span class="tp-levels">Entry: $${entryLow} – $${entryHigh} | TP <span class="tp-main">$${tp.toFixed(4)}</span></span>
+    </div>
+  `;
+}
+
+// 🚀 MOBILE-OPTIMIZED SCAN (batched, throttled)
+async function detectZone(coin, btc24hRange) {
+  // Chaos: 4h
+  const k4h = await fetchKlines(coin, '4h', 50);
+  if (k4h && k4h.length >= 50) {
+    const highs = k4h.map(k=>parseFloat(k[2]));
+    const lows = k4h.map(k=>parseFloat(k[3]));
+    const closes = k4h.map(k=>parseFloat(k[4]));
+    const vols = k4h.map(k=>parseFloat(k[5]));
+    const price = closes[closes.length-1];
+    const drop = calculateDrop(highs, price);
+    
+    if (drop >= 30 && drop <= 70) {
+      const lastHigh = parseFloat(k4h[k4h.length-1][2]);
+      const lastLow = parseFloat(k4h[k4h.length-1][3]);
+      if ((lastHigh - lastLow) / price >= 0.015) {
+        const ema7 = calculateEMA(closes.slice(-7), 7);
+        const ema25 = calculateEMA(closes.slice(-25), 25);
+        const nearLow = isNearLow(lows.slice(-10), price, 2);
+        const volAvg20 = vols.slice(-21,-1).reduce((a,b)=>a+b,0)/20;
+        const volRatio = volAvg20 > 0 ? vols[vols.length-1] / volAvg20 : 0;
+        if (ema7 < ema25 && nearLow && volRatio >= 1.3) {
+          return { zone: 'Chaos', coin, price, tp: price * 1.15, highConv: true, volatilityScore: calculateVolatilityScore(drop, volRatio, price, 'chaos') };
+        }
+      }
+    }
+  }
+
+  // Flash & Normal: 1h
+  const k1h = await fetchKlines(coin, '1h', 25);
+  if (k1h && k1h.length >= 25) {
+    const highs = k1h.map(k=>parseFloat(k[2]));
+    const lows = k1h.map(k=>parseFloat(k[3]));
+    const closes = k1h.map(k=>parseFloat(k[4]));
+    const vols = k1h.map(k=>parseFloat(k[5]));
+    const price = closes[closes.length-1];
+    const drop = calculateDrop(highs, price);
+    const ema7 = calculateEMA(closes.slice(-7), 7);
+    const ema25 = calculateEMA(closes.slice(-25), 25);
+    const vol24 = vols.slice(-24).reduce((a,b)=>a+b,0);
+    const volAvg24 = vols.slice(-25,-1).reduce((a,b)=>a+b,0)/24;
+    const volSpike = volAvg24 > 0 ? vols[vols.length-1] / volAvg24 : 0;
+    const nearLow = isNearLow(lows.slice(-6), price, 4);
+    const lastHigh = parseFloat(k1h[k1h.length-1][2]);
+    const lastLow = parseFloat(k1h[k1h.length-1][3]);
+    if ((lastHigh - lastLow) / price >= 0.015) {
+      // Flash
+      if (drop >= 10 && drop < 30 && vol24 > 2_000_000 && volSpike >= 1.5 && ema7 <= ema25 * 1.01 && nearLow) {
+        if (btc24hRange >= 2 && btc24hRange <= 6) {
+          return { zone: 'Flash', coin, price, tp: price * 1.15, highConv: true, volatilityScore: calculateVolatilityScore(drop, volSpike, price, 'flash') };
+        }
+      }
+      // Normal
+      if (drop >= 5 && drop < 10 && APPROVED_NORMAL.includes(coin) && vol24 > 2_000_000 && ema7 < ema25 && nearLow) {
+        return { zone: 'Normal', coin, price, tp: price * 1.10, highConv: drop >= 8, volatilityScore: calculateVolatilityScore(drop, volSpike, price, 'normal') };
+      }
+    }
+  }
+  return null;
+}
+
+// 📱 MOBILE-FRIENDLY RENDER
+function renderZoneSection(zoneId, results, emptyMessage) {
+  const outputEl = document.getElementById(`${zoneId}Output`);
+  const countEl = document.getElementById(`${zoneId}Count`);
+  const topOnly = document.getElementById('topOnlyToggle').checked;
+  let displayed = results;
+  if (topOnly) {
+    if (zoneId === 'chaos') displayed = results.slice(0, 1);
+    else if (zoneId === 'flash') displayed = results.slice(0, 2);
+    else if (zoneId === 'normal') displayed = results.slice(0, 5);
+  }
+  if (displayed.length > 0) {
+    outputEl.innerHTML = displayed.map(renderCoinRow).join('');
+    countEl.textContent = results.length;
+  } else {
+    outputEl.innerHTML = `<div class="status">${emptyMessage}</div>`;
+    countEl.textContent = '0';
+  }
+}
+
+// 🚨 MAIN SCAN — MOBILE OPTIMIZED
+async function startScan() {
+  const statusEl = document.getElementById('status');
+  statusEl.innerHTML = "🔄 Checking BTC...";
+
+  const [btc48h, btc24h] = await Promise.all([
+    getBTCRange('4h', 25, '48h'),
+    getBTCRange('1h', 25, '24h')
+  ]);
+
+  const btcStable = btc48h < 8;
+  const flashSafe = btcStable && btc24h >= 2 && btc24h <= 6;
+  const flashText = flashSafe ? '🟢 Flash-Safe' : '⚪ Flash-Locked';
+
+  if (!btcStable) {
+    statusEl.innerHTML = `<span class="status-danger">🔴 BTC volatile — NO TRADE</span>`;
+    ['chaos','flash','normal'].forEach(id => {
+      document.getElementById(`${id}Output`).innerHTML = '<div class="status">Market not tradeable</div>';
+      document.getElementById(`${id}Count`).textContent = '0';
+    });
+    document.getElementById('coinList').textContent = "— BTC trending —";
+    return;
+  }
+
+  statusEl.innerHTML = `🟢 BTC: ${btc48h.toFixed(1)}% • ${flashText}<br>Scanning...`;
+  document.getElementById('coinList').textContent = `(${COINS.length} coins)`;
+
+  // 🚀 SCAN IN BATCHES TO AVOID MOBILE THROTTLING
+  const results = { chaos: [], flash: [], normal: [] };
+  for (let i = 0; i < COINS.length; i++) {
+    const coin = COINS[i];
+    statusEl.innerHTML = `🟢 BTC: ${btc48h.toFixed(1)}% • ${flashText}<br>Scanning ${coin}...`;
+    const signal = await detectZone(coin, btc24h);
+    if (signal) {
+      results[signal.zone.toLowerCase()].push(signal);
+    }
+    // Small pause to avoid overwhelming mobile browser
+    if (i % 5 === 0) await new Promise(r => setTimeout(r, 100));
+  }
+
+  // Sort & render
+  ['chaos','flash','normal'].forEach(zone => {
+    results[zone].sort((a,b) => b.volatilityScore - a.volatilityScore);
+  });
+
+  renderZoneSection('chaos', results.chaos, 'No Chaos');
+  renderZoneSection('flash', results.flash, 'No Flash');
+  renderZoneSection('normal', results.normal, 'No Normal');
+
+  const total = results.chaos.length + results.flash.length + results.normal.length;
+  statusEl.innerHTML = `🟢 BTC: ${btc48h.toFixed(1)}% • ${flashText}<br><strong>${total} setup${total !== 1 ? 's' : ''} found</strong>`;
+}
+</script>
+</body>
+</html>
