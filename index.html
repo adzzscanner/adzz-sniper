@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Crypto Sniper v7.3.7 — Truthful Signals</title>
+  <style>
+    body { font-family: monospace; background: #0f0f0f; color: #0f0; padding: 12px; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h3>🎯 Crypto Sniper v7.3.7 — 8–12% / 12–20% DIPS</h3>
+  <p>Rules: Normal (8–12%) → 10% TP | Flash (12–20%) → 15% TP | 1h candles | No outcome illusion</p>
+  <pre id="log"></pre>
+
+<script>
+/* ================= USER CONFIG ================= */
+const COIN_LIST = [
+  "ZEN","FET","ADA","AVAX","ZRO","AAVE","ICP","ZEC","XLM","SOL",
+  "PYTH","RENDER","LINK","APT","INJ","TAO","SUI"
+];
+const PAIRS = COIN_LIST.map(c => c + "USDT");
+
+const MIN_VOLSCORE = 70;
+const HIGH_CONVICTION_VOLSCORE = 120; // For 15% TP
+
+/* ================= HELPERS ================= */
+async function fetchKlines(symbol, interval, limit = 1) {
+  // 🔥 FIXED: NO SPACE after 'symbol='
+  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return await response.json();
+}
+
+function dipPct(high, close) {
+  return Math.max(0, ((high - close) / high) * 100);
+}
+
+function volScore(vol, dip) {
+  return Math.round(vol * 0.0001 * (dip / 15) * 100);
+}
+
+/* ================= MODE + TP ================= */
+function tradeDecision(dip, vs) {
+  // ✅ YOUR PROVEN RANGES
+  if (dip >= 8 && dip < 12) {
+    return { mode: "NORMAL", tp: 10 };
+  }
+  if (dip >= 12 && dip < 20) {
+    if (vs >= HIGH_CONVICTION_VOLSCORE) {
+      return { mode: "FLASH+", tp: 15 };
+    }
+    // Optional: skip low-conviction Flash
+    return null; // or { mode: "FLASH", tp: 10 } if you want it
+  }
+  return null;
+}
+
+/* ================= BTC GATE (1h) ================= */
+async function checkBTCStable() {
+  const klines = await fetchKlines("BTCUSDT", "1h", 2);
+  const prevClose = parseFloat(klines[0][4]);
+  const currClose = parseFloat(klines[1][4]);
+  const move = Math.abs((currClose - prevClose) / prevClose) * 100;
+  return { stable: move < 1.0, move: move };
+}
+
+/* ================= SCAN 1h CANDLES ================= */
+async function scanSymbol(symbol) {
+  const k = await fetchKlines(symbol, "1h", 1);
+  const [open, high, low, close, volume] = k[0].map(Number);
+  
+  const dip = dipPct(high, close);
+  const vs = volScore(volume, dip);
+  
+  if (vs < MIN_VOLSCORE) return null;
+  
+  const decision = tradeDecision(dip, vs);
+  if (!decision) return null;
+  
+  return {
+    symbol: symbol.replace("USDT", ""),
+    mode: decision.mode,
+    dip: dip.toFixed(2),
+    volScore: vs,
+    tp: decision.tp
+  };
+}
+
+/* ================= RUN ================= */
+async function runScanner() {
+  const log = document.getElementById("log");
+  log.textContent = "Checking BTC stability...\n";
+  
+  let btcInfo;
+  try {
+    btcInfo = await checkBTCStable();
+  } catch (e) {
+    log.textContent += `❌ BTC fetch failed: ${e.message}\n`;
+    return;
+  }
+  
+  if (!btcInfo.stable) {
+    log.textContent += `❌ BTC unstable (${btcInfo.move.toFixed(2)}%) — no trades.\n`;
+    return;
+  }
+  
+  log.textContent += `✅ BTC stable (${btcInfo.move.toFixed(2)}%)\n\n`;
+  
+  for (const pair of PAIRS) {
+    try {
+      const signal = await scanSymbol(pair);
+      if (signal) {
+        log.textContent +=
+          `[${signal.mode}] ${signal.symbol}\n` +
+          `  Dip: ${signal.dip}% | VolScore: ${signal.volScore}\n` +
+          `  TP: ${signal.tp}%\n\n`;
+      }
+    } catch (e) {
+      // Skip delisted/unavailable coins
+      continue;
+    }
+    await new Promise(r => setTimeout(r, 60));
+  }
+  
+  log.textContent += "✅ Scan complete.";
+}
+
+window.addEventListener("load", runScanner);
+</script>
+</body>
+</html>
