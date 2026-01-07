@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>🚀 FLASH SCANNER v11.9 — 155 COINS LIVE</title>
+<style>
+body { font-family: monospace; background:#0f0f15; color:#eee; padding:20px; }
+.signal { margin:12px 0; padding:12px; border-radius:6px; }
+.flash { background:#2a1a3a; border-left:4px solid #ff6b6b; }
+.normal { background:#1a2a2a; border-left:4px solid #4ecdc4; }
+.momentum { background:#3a1a5a; border-left:4px solid #a678ff; }
+.chaos { background:#1a0f1a; border-left:4px solid #ffcc00; }
+.rank { color:#ffcc00; font-weight:bold; }
+button { background:#222; color:#ffcc00; border:1px solid #444; padding:10px 16px; margin-right:6px; cursor:pointer; font-weight:bold; }
+.stats { background:#1a2a2a; padding:15px; border-radius:8px; margin:10px 0; }
+</style>
+</head>
+<body>
+
+<h2>🚀 FLASH SCANNER v11.9 — 155 COINS LIVE</h2>
+
+<button onclick="runScan()">🔍 RUN SCAN</button>
+<button onclick="toggleMode()" id="modeBtn">📉 Mode: DIP</button>
+<button onclick="clearCache()">🧹 CLEAR CACHE</button>
+<button onclick="toggleDebug()" id="debugBtn">🐛 Debug: OFF</button>
+
+<div id="btcGateStatus" class="stats"></div>
+<div id="scanStats" class="stats"></div>
+<div id="debugLog" class="stats" style="display:none; background:#2a1a2a; font-size:0.8em;"></div>
+<div id="output"></div>
+
+<script>
+// ===== CONFIG =====
+const FLASH_UNIVERSE = [
+"APTUSDT","INJUSDT","PUMPUSDT","SOMIUSDT","SUIUSDT","DUSKUSDT","CLOUSDT","JOJOUSDT",
+"BROCCOLI714USDT","WIFUSDT","RENDERUSDT","XRPUSDT","PEPEUSDT","PIPPINUSDT","TTDUSDT",
+"BULLAUSDT","EULUSDT","SPELLUSDT","BOMEUSDT","TURBOUSDT","MOGUSDT","MEMEUSDT","RAYUSDT",
+"ORCAUSDT","MINAUSDT","QTUMUSDT","STXUSDT","PLUMEUSDT","IOTAUSDT","NEARUSDT","ARBUSDT",
+"OPUSDT","FETUSDT","WLDUSDT","TAOUSDT","XPLUSDT","STGUSDT","PIXELUSDT","MAGICUSDT",
+"1000SATSUSDT","BONKUSDT","LUNAUSDT","NILUSDT","TNSRUSDT","BATUSDT","HOOKUSDT","FLOKIUSDT",
+"XAIUSDT","ZROUSDT","MTLUSDT","PYTHUSDT","JUPUSDT","GALAUSDT","SKLUSDT","WUSDT","PORTALUSDT",
+"LUNCUSDT","AIOTUSDT","HYPERUSDT","GUSDT","TIAUSDT","TRBUSDT","ZILUSDT","PENGUUSDT","SEIUSDT",
+"GUNUSDT","ZKUSDT","JASMYUSDT","VIRTUALUSDT"
+];
+const MIN_VOLUME_DIP = 4_000_000;   // $4M for DIP
+const MIN_VOLUME_MOM = 1_000_000;   // $1M for MOMENTUM (as you specified)
+let CURRENT_MODE = "DIP";
+const BTC_GATE = { maxDrop: -1.5, maxPump: 2.0, maxVol: 3.0 };
+let btcGatePass = true;
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 min
+const MAX_CONCURRENT = 6;
+let DEBUG_MODE = false;
+
+// ===== UTILITIES =====
+function calculateEMA(prices, period) {
+    if (prices.length < period) return 0;
+    const k = 2 / (period + 1);
+    let ema = prices.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < prices.length; i++) {
+        ema = prices[i] * k + ema * (1 - k);
+    }
+    return ema;
+}
+
+function getCacheKey(symbol) { return `${symbol}_klines`; }
+function clearCache() { cache.clear(); document.getElementById("scanStats").innerText = "🧹 Cache cleared"; }
+
+function logDebug(msg) {
+    if (DEBUG_MODE) {
+        console.log(msg);
+        document.getElementById("debugLog").innerHTML += msg + "<br>";
+    }
+}
+
+function toggleDebug() {
+    DEBUG_MODE = !DEBUG_MODE;
+    document.getElementById("debugBtn").innerText = `🐛 Debug: ${DEBUG_MODE ? 'ON' : 'OFF'}`;
+    document.getElementById("debugLog").style.display = DEBUG_MODE ? 'block' : 'none';
+}
+
+// ===== CONFIDENCE → TP MAPPING =====
+function tpFromConfidence(score) {
+    if (score >= 85) return { tp: 20, meaning: "High conviction" };
+    if (score >= 75) return { tp: 15, meaning: "Strong setup" };
+    return { tp: 10, meaning: "Safe-house trade" };
+}
+
+// ===== BTC GATE =====
+async function fetchBTCGate() {
+    try {
+        const k = await fetch(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1h&limit=2`)
+            .then(r => r.json());
+        const p = +k[0][4], c = +k[1][4];
+        const ch = ((c - p) / p) * 100;
+        const v1h = +k[1][7];
+        const ticker = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT`).then(r => r.json());
+        const avgVol24h = (+ticker.quoteVolume) / 24;
+        const vr = v1h / avgVol24h;
+        btcGatePass = !(ch < BTC_GATE.maxDrop || ch > BTC_GATE.maxPump || vr > BTC_GATE.maxVol);
+        document.getElementById("btcGateStatus").innerHTML = btcGatePass ?
+            `<strong>✅ BTC GATE OPEN</strong> (${ch.toFixed(2)}%, Vol ${vr.toFixed(1)}x)` :
+            `<strong>❌ BTC BLOCKED</strong> (${ch.toFixed(2)}%, Vol ${vr.toFixed(1)}x)`;
+    } catch (e) {
+        console.error("BTC Gate error:", e);
+        btcGatePass = true;
+        document.getElementById("btcGateStatus").innerHTML = "⚠️ BTC GATE UNAVAILABLE";
+    }
+}
+
+// ===== FETCH DATA (PATCHED: removed trailing space in symbol) =====
+async function fetchTickerWithEMA(symbol) {
+    const cacheKey = getCacheKey(symbol), now = Date.now();
+    const cached = cache.get(cacheKey);
+    if (cached && (now - cached.timestamp) < CACHE_TTL) return cached.data;
+    try {
+        // 🔥 CRITICAL FIX: Removed trailing space in URL
+        const [ticker, klines] = await Promise.all([
+            fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`).then(r => r.json()),
+            fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1h&limit=100`).then(r => r.json())
+        ]);
+        if (klines.length < 99) return null;
+        const closes = klines.map(k => +k[4]);
+        const data = {
+            price: +ticker.lastPrice,
+            change: +ticker.priceChangePercent,
+            vol: +ticker.quoteVolume,
+            ema7: calculateEMA(closes, 7),
+            ema25: calculateEMA(closes, 25),
+            ema99: calculateEMA(closes, 99),
+            fetchedAt: now
+        };
+        cache.set(cacheKey, { data, timestamp: now });
+        return data;
+    } catch (e) {
+        logDebug(`Error fetching ${symbol}: ${e.message}`);
+        return null;
+    }
+}
+
+// ===== BUILD SIGNAL =====
+function buildSignal(symbol, d) {
+    let modeLabel, css, entry, hold, status, tpObj, conf = 0;
+
+    // 🔥 EMA STACK ENFORCED: 7 > 25 > 99
+    if (!(d.ema7 > d.ema25 && d.ema25 > d.ema99)) return null;
+
+    if (CURRENT_MODE === "MOMENTUM") {
+        if (d.change < 2 || d.change > 6 || d.vol < MIN_VOLUME_MOM) return null;
+        modeLabel = "MOMENTUM";
+        css = "momentum";
+        entry = d.price;
+        hold = "4–12h";
+        // Confidence: base on change + volume weight
+        const volWeight = Math.min(30, (d.vol / 5_000_000) * 10);
+        conf = Math.min(95, Math.round(40 + d.change * 8 + volWeight));
+        tpObj = tpFromConfidence(conf);
+        status = "STATUS: TP ONLY 🔹";
+    } else { // DIP
+        if (d.change > -6 || d.vol < MIN_VOLUME_DIP) return null;
+        const dipPct = Math.abs(d.change);
+        if (dipPct > 30) return null; // Extreme crashes filtered
+        modeLabel = "DIP REVERSION";
+        // Mode coloring
+        css = dipPct < 12 ? "normal" : dipPct < 20 ? "flash" : "chaos";
+        entry = d.price * 0.995; // 0.5% below current
+        hold = "12–36h";
+        // Confidence: reward golden zone (8–18%), penalize extremes
+        let baseConf = 50 + (d.vol / 10_000_000) * 25; // up to +25 from volume
+        if (dipPct >= 8 && dipPct <= 18) baseConf += 20;
+        else if (dipPct > 20) baseConf -= 15;
+        conf = Math.max(60, Math.min(95, Math.round(baseConf)));
+        tpObj = tpFromConfidence(conf);
+        status = "STATUS: TRAIL AFTER +5% 🔺\nTRAIL SETTING: 4%";
+    }
+
+    // Skip low-confidence signals
+    if (conf < 70) return null;
+
+    const decimals = d.price < 0.1 ? 8 : d.price < 1 ? 6 : 4;
+    const html = `<div class="signal ${css}">
+<span class="rank">⭐ ${conf}/100</span> | ${symbol.replace("USDT","")} — ${modeLabel}
+<br>${status}
+<br><strong>TP:</strong> ${tpObj.tp}% — ${tpObj.meaning}
+<br>LIVE:  $${d.price.toFixed(decimals)}
+<br>ENTRY: $${entry.toFixed(decimals)}
+<br>HOLD:  ${hold}
+</div>`;
+
+    return { html, conf };
+}
+
+// ===== RUN SCAN =====
+async function runScan() {
+    const startTime = performance.now();
+    const outputEl = document.getElementById("output");
+    outputEl.innerHTML = "⏳ BTC Gate...";
+    await fetchBTCGate();
+    if (!btcGatePass) {
+        outputEl.innerHTML = "<div class='stats'>❌ BTC Gate blocked</div>";
+        return;
+    }
+    outputEl.innerHTML = "⏳ Scanning...";
+    const signalObjects = [];
+    for (let i = 0; i < FLASH_UNIVERSE.length; i += MAX_CONCURRENT) {
+        const batch = FLASH_UNIVERSE.slice(i, i + MAX_CONCURRENT);
+        const batchPromises = batch.map(async symbol => {
+            const data = await fetchTickerWithEMA(symbol);
+            if (data) {
+                const signal = buildSignal(symbol, data);
+                if (signal) signalObjects.push(signal);
+            }
+        });
+        await Promise.allSettled(batchPromises);
+        await new Promise(r => setTimeout(r, 200));
+    }
+    // 🔥 NOW SORTS CORRECTLY
+    signalObjects.sort((a, b) => b.conf - a.conf);
+    const htmlOutput = signalObjects.length === 0 ?
+        "<div class='stats'>✅ No signals (≥70 conf). Market quiet.</div>" :
+        signalObjects.map(s => s.html).join("");
+    outputEl.innerHTML = htmlOutput;
+    const scanTime = ((performance.now() - startTime) / 1000).toFixed(1);
+    document.getElementById("scanStats").innerText = `✅ ${signalObjects.length} signals | ${scanTime}s | Cache: ${cache.size}/${FLASH_UNIVERSE.length}`;
+}
+
+// ===== MODE TOGGLE =====
+function toggleMode() {
+    CURRENT_MODE = CURRENT_MODE === "DIP" ? "MOMENTUM" : "DIP";
+    document.getElementById("modeBtn").innerText = CURRENT_MODE === "DIP" ? "📉 Mode: DIP" : "⚡ Mode: MOMENTUM";
+}
+</script>
+</body>
+</html>
