@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grid Scanner</title>
+  <style>
+    body { background: #000; color: #0f0; font-family: monospace; padding: 10px; margin: 0; }
+    .header { color: #0ff; font-size: 1.4em; margin: 10px 0; }
+    .signal { margin: 8px 0; padding: 8px; border: 1px solid #0a0; background: #001500; }
+    .coin { font-weight: bold; color: #ff0; }
+    .status { color: #0f0; }
+    .reason { font-size: 0.85em; opacity: 0.8; margin-top: 4px; }
+    .progress { color: #888; margin: 10px 0; }
+    .error { color: #f44; }
+    .section { color: #0a0; margin-top: 12px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="header">🔍 Grid Scanner</div>
+  <div id="progress" class="progress">Checking BTC status...</div>
+  <div id="output"></div>
+
+  <script>
+    // === YOUR HARD RULES ===
+    const MIN_VOLUME = 8_000_000;
+    const MAX_EMA_SPREAD = 0.025;
+    const MIN_DIP = 8;
+    const BATCH_SIZE = 50;
+    const TOP_5 = ["WIFUSDT", "PEPEUSDT", "BONKUSDT", "XRPUSDT", "DOGEUSDT"];
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    // === BTC CHECK ===
+    async function isBtcStable() {
+      try {
+        const res = await fetch('https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60&limit=50');
+        const data = await res.json();
+        if (!data.result?.list) return true;
+        const closes = data.result.list.map(c => parseFloat(c[4])).reverse();
+        let ema = closes[0];
+        const k = 2 / 21;
+        for (let i = 1; i < closes.length; i++) {
+          ema = (closes[i] * k) + (ema * (1 - k));
+        }
+        return closes[0] > ema;
+      } catch {
+        return true;
+      }
+    }
+
+    // === FETCH ALL SYMBOLS ===
+    async function fetchAllSymbols() {
+      const res = await fetch('https://api.bybit.com/v5/market/tickers?category=linear');
+      const data = await res.json();
+      return data.result.list
+        .filter(t => 
+          t.symbol.endsWith('USDT') && 
+          parseFloat(t.volume24h) >= MIN_VOLUME &&
+          parseFloat(t.lastPrice) > 0.0001
+        )
+        .map(t => t.symbol);
+    }
+
+    // === ANALYZE ONE COIN ===
+    async function analyzeCoin(symbol) {
+      try {
+        const res = await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=60&limit=50`);
+        const data = await res.json();
+        if (!data.result?.list || data.result.list.length < 30) return null;
+
+        const c = data.result.list.map(x => ({
+          h: parseFloat(x[2]), l: parseFloat(x[3]), c: parseFloat(x[4]), v: parseFloat(x[5])
+        })).reverse();
+
+        if (c[0].c < 0.001) return null;
+
+        // EMA compression
+        let e7 = c[0].c, e28 = c[0].c;
+        for (let i = 1; i < c.length; i++) {
+          e7 = c[i].c * (2/8) + e7 * (6/8);
+          e28 = c[i].c * (2/29) + e28 * (27/29);
+        }
+        if (Math.abs(e7 - e28) / e28 > MAX_EMA_SPREAD) return null;
+
+        // Higher low
+        const recentLow = Math.min(...c.slice(0,24).map(x => x.l));
+        const priorLow = Math.min(...c.slice(24,48).map(x => x.l));
+        if (recentLow <= priorLow) return null;
+
+        // Dip & volume
+        const high24 = Math.max(...c.slice(0,24).map(x => x.h));
+        const dipPct = (high24 - c[0].c) / high24 * 100;
+        if (dipPct < MIN_DIP) return null;
+        const dipVol = c.slice(0,6).reduce((s,x) => s + x.v, 0);
+        const avgVol = c.slice(0,24).reduce((s,x) => s + x.v, 0) / 24;
+        if (dipVol > avgVol * 1.2) return null;
+
+        // RSI6
+        let g=0, l=0;
+        for (let i=1; i<=6; i++) {
+          const ch = c[i-1].c - c[i].c;
+          if (ch > 0) g += ch; else l += Math.abs(ch);
+        }
+        const rsi6 = 100 - (100 / (1 + (g / (l || 1))));
+        if (rsi6 > 60) return null;
+
+        return { symbol, leverage: dipPct >= 15 ? "x5" : "x3", dipPct: dipPct.toFixed(1), rsi6: rsi6.toFixed(0) };
+      } catch {
+        return null;
+      }
+    }
+
+    // === BATCH PROCESSOR ===
+    async function processBatch(symbols, start, total, updateProgress) {
+      const end = Math.min(start + BATCH_SIZE, symbols.length);
+      updateProgress(`Scanning ${start+1}-${end} of ${total}...`);
+
+      const promises = symbols.slice(start, end).map(sym => analyzeCoin(sym));
+      const results = (await Promise.all(promises)).filter(r => r);
+
+      await sleep(600);
+      return results;
+    }
+
+    // === RENDER WITH PRIORITY ===
+    function renderResults(allResults) {
+      const topResults = allResults.filter(r => TOP_5.includes(r.symbol));
+      const otherResults = allResults.filter(r => !TOP_5.includes(r.symbol));
+
+      let html = "";
+      
+      if (topResults.length > 0) {
+        html += '<div class="section">🏆 TOP 5 PRIORITY</div>';
+        topResults.forEach(r => {
+          html += `<div class="signal"><span class="coin">${r.symbol}</span> <span class="status">[${r.leverage} GRID] ✅ APPROVED</span><div class="reason">Dip: ${r.dipPct}% | RSI6: ${r.rsi6}</div></div>`;
+        });
+      }
+
+      if (otherResults.length > 0) {
+        html += '<div class="section">💎 OTHER OPPORTUNITIES</div>';
+        otherResults.forEach(r => {
+          html += `<div class="signal"><span class="coin">${r.symbol}</span> <span class="status">[${r.leverage} GRID] ✅ APPROVED</span><div class="reason">Dip: ${r.dipPct}% | RSI6: ${r.rsi6}</div></div>`;
+        });
+      }
+
+      if (html === "") {
+        html = '<div class="progress">🟢 No clean signals found</div>';
+      }
+
+      document.getElementById("output").innerHTML = html;
+      document.getElementById("progress").textContent = `✅ Found ${allResults.length} signal(s)`;
+    }
+
+    // === MAIN SCAN ===
+    async function runScan() {
+      document.getElementById("progress").textContent = "Checking BTC stability...";
+      
+      if (!(await isBtcStable())) {
+        document.getElementById("output").innerHTML = '<div class="error">🛑 BTC unstable — grids paused</div>';
+        return;
+      }
+
+      document.getElementById("progress").textContent = "Fetching all coins...";
+      const symbols = await fetchAllSymbols();
+      
+      if (symbols.length === 0) {
+        document.getElementById("output").innerHTML = '<div class="error">❌ No coins meet volume threshold</div>';
+        return;
+      }
+
+      let allResults = [];
+      const total = symbols.length;
+      const updateProgress = msg => {
+        document.getElementById("progress").textContent = msg;
+      };
+
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const batchResults = await processBatch(symbols, i, total, updateProgress);
+        allResults = allResults.concat(batchResults);
+      }
+
+      renderResults(allResults);
+    }
+
+    runScan();
+  </script>
+</body>
+</html>
