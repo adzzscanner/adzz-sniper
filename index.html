@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grid Scanner</title>
+  <style>
+    body { background: #000; color: #0f0; font-family: monospace; padding: 10px; margin: 0; }
+    .header { color: #0ff; font-size: 1.4em; margin: 10px 0; }
+    .signal { margin: 8px 0; padding: 8px; border: 1px solid #0a0; background: #001500; }
+    .coin { font-weight: bold; color: #ff0; }
+    .status { color: #0f0; }
+    .reason { font-size: 0.85em; opacity: 0.8; margin-top: 4px; }
+    .progress { color: #888; margin: 10px 0; }
+    .error { color: #f44; }
+    .footer { color: #666; font-size: 0.8em; margin-top: 15px; }
+  </style>
+</head>
+<body>
+  <div class="header">🔍 Grid Scanner</div>
+  <div id="progress" class="progress">Checking BTC status...</div>
+  <div id="output"></div>
+  <div class="footer">✅ Rules: Vol≥$8M • EMA flat • Higher low • Low-vol dip</div>
+
+  <script>
+    // === YOUR HARD RULES ===
+    const MIN_VOLUME = 8_000_000;
+    const MAX_EMA_SPREAD = 0.025;
+    const MIN_DIP = 8;
+    const BATCH_SIZE = 50;
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    // === BTC STABILITY CHECK ===
+    async function isBtcStable() {
+      try {
+        const res = await fetch('https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60&limit=50');
+        const data = await res.json();
+        if (!data.result?.list) return true;
+        
+        const closes = data.result.list.map(c => parseFloat(c[4])).reverse();
+        let ema = closes[0];
+        const k = 2 / 21;
+        for (let i = 1; i < closes.length; i++) {
+          ema = (closes[i] * k) + (ema * (1 - k));
+        }
+        return closes[0] > ema;
+      } catch {
+        return true;
+      }
+    }
+
+    // === FETCH ALL SYMBOLS ===
+    async function fetchAllSymbols() {
+      const res = await fetch('https://api.bybit.com/v5/market/tickers?category=linear');
+      const data = await res.json();
+      return data.result.list
+        .filter(t => 
+          t.symbol.endsWith('USDT') && 
+          parseFloat(t.volume24h) >= MIN_VOLUME &&
+          parseFloat(t.lastPrice) > 0.0001
+        )
+        .map(t => t.symbol);
+    }
+
+    // === ANALYZE ONE COIN (STRUCTURE ONLY) ===
+    async function analyzeCoin(symbol) {
+      try {
+        const res = await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=60&limit=50`);
+        const data = await res.json();
+        if (!data.result?.list || data.result.list.length < 30) return null;
+
+        const candles = data.result.list.map(c => ({
+          h: parseFloat(c[2]),
+          l: parseFloat(c[3]),
+          c: parseFloat(c[4]),
+          v: parseFloat(c[5])
+        })).reverse();
+
+        // Skip micro coins
+        if (candles[0].c < 0.001) return null;
+
+        // EMA7 & EMA28
+        let ema7 = candles[0].c, ema28 = candles[0].c;
+        for (let i = 1; i < candles.length; i++) {
+          ema7 = candles[i].c * (2/8) + ema7 * (6/8);
+          ema28 = candles[i].c * (2/29) + ema28 * (27/29);
+        }
+        if (Math.abs(ema7 - ema28) / ema28 > MAX_EMA_SPREAD) return null;
+
+        // Higher low check (last 24h vs prior 24h)
+        const recentLow = Math.min(...candles.slice(0, 24).map(c => c.l));
+        const priorLow = Math.min(...candles.slice(24, 48).map(c => c.l));
+        if (recentLow <= priorLow) return null; // ❌ BREAKDOWN
+
+        // Dip size
+        const high24 = Math.max(...candles.slice(0, 24).map(c => c.h));
+        const dipPct = ((high24 - candles[0].c) / high24) * 100;
+        if (dipPct < MIN_DIP) return null;
+
+        // Volume profile: dip must be low-volume
+        const dipVol = candles.slice(0, 6).reduce((sum, c) => sum + c.v, 0);
+        const avgVol = candles.slice(0, 24).reduce((sum, c) => sum + c.v, 0) / 24;
+        if (dipVol > avgVol * 1.2) return null;
+
+        // RSI6 (optional but recommended)
+        let gains = 0, losses = 0;
+        for (let i = 1; i <= 6; i++) {
+          const change = candles[i-1].c - candles[i].c;
+          if (change > 0) gains += change;
+          else losses += Math.abs(change);
+        }
+        const rs = gains / (losses || 1);
+        const rsi6 = 100 - (100 / (1 + rs));
+        if (rsi6 > 60) return null; // Avoid overbought
+
+        const leverage = dipPct >= 15 ? "x5" : "x3";
+        return { symbol, leverage, dipPct: dipPct.toFixed(1), rsi6: rsi6.toFixed(0) };
+      } catch {
+        return null;
+      }
+    }
+
+    // === BATCH PROCESSOR ===
+    async function processBatch(symbols, start, total, updateProgress) {
+      const end = Math.min(start + BATCH_SIZE, symbols.length);
+      updateProgress(`Scanning ${start+1}-${end} of ${total}...`);
+
+      const promises = symbols.slice(start, end).map(sym => analyzeCoin(sym));
+      const results = (await Promise.all(promises)).filter(r => r);
+
+      await sleep(600); // Respect rate limits
+      return results;
+    }
+
+    // === MAIN SCAN ===
+    async function runScan() {
+      document.getElementById("progress").textContent = "Checking BTC stability...";
+      
+      if (!(await isBtcStable())) {
+        document.getElementById("output").innerHTML = '<div class="error">🛑 BTC unstable — no grids allowed</div>';
+        return;
+      }
+
+      document.getElementById("progress").textContent = "Fetching all coins...";
+      const symbols = await fetchAllSymbols();
+      
+      if (symbols.length === 0) {
+        document.getElementById("output").innerHTML = '<div class="error">❌ No coins meet volume threshold</div>';
+        return;
+      }
+
+      let allResults = [];
+      const total = symbols.length;
+      const updateProgress = msg => {
+        document.getElementById("progress").textContent = msg;
+      };
+
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const batchResults = await processBatch(symbols, i, total, updateProgress);
+        allResults = allResults.concat(batchResults);
+      }
+
+      // Render only clean signals
+      if (allResults.length === 0) {
+        document.getElementById("output").innerHTML = '<div class="progress">🟢 No clean grid signals found</div>';
+        document.getElementById("progress").textContent = "Scan complete.";
+      } else {
+        let html = "";
+        allResults.forEach(r => {
+          html += `
+            <div class="signal">
+              <span class="coin">${r.symbol}</span>
+              <span class="status">[${r.leverage} GRID] ✅ APPROVED</span>
+              <div class="reason">Dip: ${r.dipPct}% | RSI6: ${r.rsi6}</div>
+            </div>
+          `;
+        });
+        document.getElementById("output").innerHTML = html;
+        document.getElementById("progress").textContent = `✅ Found ${allResults.length} clean signal(s)`;
+      }
+    }
+
+    runScan();
+  </script>
+</body>
+</html>
