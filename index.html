@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bybit Grid Scanner</title>
+  <style>
+    body { background: #000; color: #0f0; font-family: monospace; padding: 10px; }
+    .signal { margin: 10px 0; padding: 10px; border: 1px solid #0f0; }
+    .approved { background: #002200; }
+    .coin { font-weight: bold; }
+    .status { color: #ff0; }
+    .reason { font-size: 0.9em; display: block; margin-top: 5px; }
+    .header { color: #0ff; font-size: 1.5em; margin-bottom: 20px; }
+    .refresh { color: #fff; margin-top: 20px; }
+    .no-signal { color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="header">🔍 Bybit Long-Only Grid Scanner</div>
+  <div id="output"></div>
+  <div class="refresh">🔄 Auto-refreshing every 5 minutes...</div>
+
+  <script>
+    // CONFIG — EDIT THESE FOR YOUR RULES
+    const MIN_VOLUME = 8_000_000; // $8M
+    const BTC_EMA20_THRESHOLD = 0.025; // 2.5% EMA spread max
+    const DIP_THRESHOLD = 8; // Min dip % for x3 grid
+    const DEEP_DIP_THRESHOLD = 15; // Min dip % for x5 grid
+
+    // SIMULATED DATA — REPLACE WITH REAL API CALLS LATER
+    const mockData = [
+      {
+        symbol: "GPSUSDT",
+        price: 0.006572,
+        change24h: -22.7,
+        volume24h: 49_390_000,
+        ema7: 0.006215,
+        ema14: 0.005982,
+        ema28: 0.005518,
+        rsi6: 10,
+        high24h: 0.008340,
+        low24h: 0.005923,
+        priorLow: 0.004368,
+        dipVolume: 50_000_000,
+        avgVolume: 40_000_000
+      },
+      {
+        symbol: "KAITOUSDT",
+        price: 0.5654,
+        change24h: -5.10,
+        volume24h: 8_890_000,
+        ema7: 0.5711,
+        ema14: 0.5613,
+        ema28: 0.5446,
+        rsi6: 33,
+        high24h: 0.6128,
+        low24h: 0.5589,
+        priorLow: 0.4690,
+        dipVolume: 7_000_000,
+        avgVolume: 8_000_000
+      },
+      // Add more coins as needed
+    ];
+
+    function analyzeCoin(coin) {
+      const emaDiff = Math.abs(coin.ema7 - coin.ema28) / coin.ema28;
+      const isHigherLow = coin.low24h > coin.priorLow;
+      const isLowVolumeDip = coin.dipVolume < coin.avgVolume * 1.2;
+
+      const passesEMA = emaDiff <= BTC_EMA20_THRESHOLD;
+      const passesHigherLow = isHigherLow;
+      const passesVolume = isLowVolumeDip;
+
+      if (!passesEMA || !passesHigherLow || !passesVolume) {
+        return null; // Reject — don't show
+      }
+
+      const dipPercent = Math.abs(coin.change24h);
+      const leverage = dipPercent >= DEEP_DIP_THRESHOLD ? "x5" : "x3";
+
+      return {
+        symbol: coin.symbol,
+        leverage,
+        dip: dipPercent,
+        rsi6: coin.rsi6,
+        emaDiff: emaDiff
+      };
+    }
+
+    function render() {
+      let output = "<div>🛡️ Checking BTC stability (1h EMA20)...</div>";
+      output += "<div>✅ BTC stable — scanning alts</div>";
+
+      const approvedSignals = mockData.map(analyzeCoin).filter(Boolean);
+
+      if (approvedSignals.length === 0) {
+        output += `<div class="no-signal">🟢 No clean grid signals found. Wait for next scan.</div>`;
+      } else {
+        approvedSignals.forEach(signal => {
+          output += `
+            <div class="signal approved">
+              <span class="coin">${signal.symbol}</span>
+              <span class="status">[${signal.leverage} GRID] ✅ APPROVED</span>
+              <span class="reason">Dip: ${signal.dip.toFixed(1)}% | RSI6: ${signal.rsi6} | EMA diff: ${(signal.emaDiff*100).toFixed(1)}%</span>
+            </div>
+          `;
+        });
+      }
+
+      document.getElementById("output").innerHTML = output;
+    }
+
+    // Auto-refresh every 5 minutes
+    setInterval(render, 300000); // 5 minutes
+    render(); // Initial render
+  </script>
+</body>
+</html>
