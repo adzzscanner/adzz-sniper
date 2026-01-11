@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Grid Scanner</title>
+  <style>
+    body { background: #000; color: #0f0; font-family: monospace; padding: 10px; margin: 0; }
+    .header { color: #0ff; font-size: 1.4em; margin: 10px 0; }
+    .signal { margin: 8px 0; padding: 8px; border: 1px solid #0a0; background: #001500; }
+    .coin { font-weight: bold; color: #ff0; }
+    .status { color: #0f0; }
+    .reason { font-size: 0.85em; opacity: 0.8; margin-top: 4px; }
+    .progress { color: #888; margin: 10px 0; }
+    .error { color: #f44; }
+    .section { color: #0a0; margin-top: 12px; font-weight: bold; }
+    .action { color: #0f0; font-weight: bold; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="header">🔍 Grid Scanner</div>
+  <div id="progress" class="progress">Checking BTC knife gate...</div>
+  <div id="output"></div>
+
+  <script>
+    // === YOUR PHASE SETTINGS ===
+    const MIN_VOLUME = 4_000_000; // $4M for aggressive phase (<$1k account)
+    const BATCH_SIZE = 50;
+    const TIER_A = ["WIFUSDT", "PEPEUSDT"];
+    const TIER_B = ["BONKUSDT"];
+    const TIER_C = ["DOGEUSDT"];
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    // === BTC KNIFE GATE ===
+    async function isBtcKnifeActive() {
+      try {
+        const res = await fetch('https://api.bybit.com/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60&limit=3');
+        const data = await res.json();
+        if (!data.result?.list || data.result.list.length < 3) return false;
+
+        const c = data.result.list.map(x => ({
+          h: parseFloat(x[2]),
+          l: parseFloat(x[3]),
+          c: parseFloat(x[4]),
+          v: parseFloat(x[5])
+        }));
+
+        const dropPct = ((c[1].c - c[0].l) / c[1].c) * 100;
+        const volSurge = c[0].v >= ((c[1].v + c[2].v) / 2) * 2;
+        const atrSpike = (c[0].h - c[0].l) >= (((c[1].h - c[1].l) + (c[2].h - c[2].l)) / 2) * 2;
+
+        return (dropPct >= 3.5 && volSurge && atrSpike) || dropPct >= 4.0;
+      } catch {
+        return false;
+      }
+    }
+
+    // === RANGE INTEGRITY ===
+    function calculateRangeIntegrity(candles, high, low) {
+      let inside = 0;
+      candles.forEach(c => {
+        if (c.c >= low && c.c <= high) inside++;
+      });
+      const respect = (inside / candles.length) * 100;
+      
+      let penalty = 0;
+      candles.forEach(c => {
+        if (c.h > high) penalty += ((c.h - high) / high) * 50;
+        if (c.l < low) penalty += ((low - c.l) / low) * 50;
+      });
+      
+      return Math.max(0, Math.min(100, respect - penalty));
+    }
+
+    // === ANALYZE ONE COIN ===
+    async function analyzeCoin(symbol) {
+      try {
+        const res = await fetch(`https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=60&limit=50`);
+        const data = await res.json();
+        if (!data.result?.list || data.result.list.length < 50) return null;
+
+        const candles = data.result.list.map(c => ({
+          h: parseFloat(c[2]),
+          l: parseFloat(c[3]),
+          c: parseFloat(c[4]),
+          v: parseFloat(c[5])
+        }));
+
+        // ATR ≥ 2.5%
+        let atrSum = 0;
+        for (let i = 0; i < 14; i++) {
+          const tr = Math.max(candles[i].h - candles[i].l, Math.abs(candles[i].h - candles[i+1].c), Math.abs(candles[i].l - candles[i+1].c));
+          atrSum += tr;
+        }
+        const atrPct = (atrSum / 14 / candles[0].c) * 100;
+        if (atrPct < 2.5) return null;
+
+        // Volume ≥ $4M
+        const vol24 = candles.slice(0, 24).reduce((s, c) => s + c.v, 0);
+        if (vol24 < MIN_VOLUME) return null;
+
+        // Range (48h)
+        const highs = candles.slice(0, 48).map(c => c.h);
+        const lows = candles.slice(0, 48).map(c => c.l);
+        const rangeHigh = Math.max(...highs);
+        const rangeLow = Math.min(...lows);
+        const rangeWidthPct = ((rangeHigh - rangeLow) / candles[0].c) * 100;
+        if (rangeWidthPct > 10) return null;
+
+        // Range Integrity ≥ 50
+        const ri = calculateRangeIntegrity(candles.slice(0, 48), rangeHigh, rangeLow);
+        if (ri < 50) return null;
+
+        // Leverage & Grid Count
+        let leverage = "x2";
+        let gridCount = 8;
+        
+        if (TIER_A.includes(symbol)) {
+          if (vol24 >= 50_000_000 && atrPct >= 4.0 && rangeWidthPct <= 7.5 && ri >= 85) {
+            leverage = "x5";
+            gridCount = 11;
+          } else if (vol24 >= 20_000_000) {
+            leverage = "x3";
+            gridCount = 10;
+          }
+        } else if (TIER_B.includes(symbol)) {
+          if (vol24 >= 20_000_000) {
+            leverage = "x3";
+            gridCount = 9;
+          }
+        } else if (TIER_C.includes(symbol)) {
+          leverage = "x2";
+          gridCount = 8;
+        } else {
+          // Opportunity coins
+          if (vol24 >= 50_000_000 && atrPct >= 4.0 && ri >= 85) {
+            leverage = "x5";
+            gridCount = 11;
+          } else if (vol24 >= 20_000_000) {
+            leverage = "x3";
+            gridCount = 9;
+          } else {
+            leverage = "x2";
+            gridCount = 8;
+          }
+        }
+
+        const lower = (rangeLow * 0.98).toFixed(4);
+        const upper = (rangeHigh * 1.02).toFixed(4);
+        const spacing = ((parseFloat(upper) - parseFloat(lower)) / (gridCount - 1)).toFixed(4);
+
+        return { symbol, leverage, gridCount, lower, upper, spacing, atr: atrPct.toFixed(1), ri: ri.toFixed(0) };
+      } catch {
+        return null;
+      }
+    }
+
+    // === FETCH ALL SYMBOLS ===
+    async function fetchAllSymbols() {
+      const res = await fetch('https://api.bybit.com/v5/market/tickers?category=linear');
+      const data = await res.json();
+      return data.result.list
+        .filter(t => t.symbol.endsWith('USDT') && parseFloat(t.volume24h) >= MIN_VOLUME && parseFloat(t.lastPrice) > 0.0001)
+        .map(t => t.symbol);
+    }
+
+    // === BATCH PROCESSOR ===
+    async function processBatch(symbols, start, total, updateProgress) {
+      const end = Math.min(start + BATCH_SIZE, symbols.length);
+      updateProgress(`Scanning ${start+1}-${end} of ${total}...`);
+      const promises = symbols.slice(start, end).map(sym => analyzeCoin(sym));
+      const results = (await Promise.all(promises)).filter(r => r);
+      await sleep(600);
+      return results;
+    }
+
+    // === RENDER WITH CLEAR INSTRUCTIONS ===
+    function renderResults(results) {
+      const a = results.filter(r => TIER_A.includes(r.symbol));
+      const b = results.filter(r => TIER_B.includes(r.symbol));
+      const c = results.filter(r => TIER_C.includes(r.symbol));
+      const others = results.filter(r => ![...TIER_A, ...TIER_B, ...TIER_C].includes(r.symbol));
+
+      let html = "";
+      const addSection = (coins, title) => {
+        if (coins.length) {
+          html += `<div class="section">${title}</div>`;
+          coins.forEach(r => {
+            html += `
+              <div class="signal">
+                <span class="coin">${r.symbol}</span>
+                <span class="status">[${r.leverage} GRID] ✅ RI:${r.ri}</span>
+                <div class="reason">Range: ${r.lower}–${r.upper} | Grids: ${r.gridCount} | Spacing: ${r.spacing}</div>
+                <div class="action">➡️ SET UP ${r.gridCount}-GRID FROM ${r.lower} TO ${r.upper} AT ${r.leverage}</div>
+              </div>
+            `;
+          });
+        }
+      };
+
+      addSection(a, "🔥 TIER A: Always-On");
+      addSection(b, "⚡ TIER B: Event-Driven");
+      addSection(c, "🌊 TIER C: BTC-Dependent");
+      addSection(others, "💎 OPPORTUNITY");
+
+      if (!html) html = '<div class="progress">🟢 No high-integrity setups</div>';
+
+      document.getElementById("output").innerHTML = html;
+      document.getElementById("progress").textContent = `✅ Found ${results.length} setup(s)`;
+    }
+
+    // === MAIN SCAN ===
+    async function runScan() {
+      document.getElementById("progress").textContent = "Checking BTC knife gate...";
+      
+      if (await isBtcKnifeActive()) {
+        document.getElementById("output").innerHTML = '<div class="error">🔪 BTC knife active — pause new grids</div>';
+        return;
+      }
+
+      document.getElementById("progress").textContent = "Fetching all coins...";
+      const symbols = await fetchAllSymbols();
+      if (symbols.length === 0) {
+        document.getElementById("output").innerHTML = '<div class="error">❌ No coins meet volume threshold</div>';
+        return;
+      }
+
+      let allResults = [];
+      const total = symbols.length;
+      const updateProgress = msg => {
+        document.getElementById("progress").textContent = msg;
+      };
+
+      for (let i = 0; i < total; i += BATCH_SIZE) {
+        const batchResults = await processBatch(symbols, i, total, updateProgress);
+        allResults = allResults.concat(batchResults);
+      }
+
+      renderResults(allResults);
+    }
+
+    runScan();
+  </script>
+</body>
+</html>
