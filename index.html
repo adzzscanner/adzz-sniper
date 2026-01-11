@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Phase 1 Rules — v1.0 (Final)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #000;
+      color: #fff;
+      padding: 16px;
+      line-height: 1.55;
+      font-size: 18px;
+    }
+    h1 {
+      font-size: 24px;
+      color: #4ade80;
+      text-align: center;
+      margin: 12px 0;
+      font-weight: bold;
+    }
+    h2 {
+      font-size: 20px;
+      color: #60a5fa;
+      margin: 22px 0 10px 0;
+      border-bottom: 1px solid #333;
+      padding-bottom: 4px;
+    }
+    .rule {
+      background: #111;
+      padding: 14px;
+      border-left: 4px solid #4ade80;
+      margin: 14px 0;
+      border-radius: 6px;
+      font-size: 19px;
+    }
+    .leverage {
+      display: inline-block;
+      padding: 4px 10px;
+      margin: 0 6px 6px 0;
+      border-radius: 5px;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .x5 { background: #1a0a0a; color: #f87171; border: 1px solid #dc2626; }
+    .x3 { background: #1a150a; color: #fcd34d; border: 1px solid #d97706; }
+    .x2 { background: #0a1a22; color: #93c5fd; border: 1px solid #0ea5e9; }
+    .output {
+      background: #0a0a0a;
+      padding: 16px;
+      font-size: 20px;
+      margin: 16px 0;
+      border: 1px dashed #4ade80;
+      border-radius: 8px;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .note {
+      color: #a0aec0;
+      font-style: italic;
+      font-size: 17px;
+      margin-top: 8px;
+    }
+    ul {
+      padding-left: 20px;
+      margin: 12px 0;
+    }
+    li {
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+    hr {
+      border: 0;
+      border-top: 1px solid #333;
+      margin: 24px 0;
+    }
+    .step { 
+      background: #0f172a; 
+      padding: 12px; 
+      border-left: 3px solid #8b5cf6; 
+      margin: 12px 0; 
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>PHASE 1 RULES — v1.0 (FINAL)</h1>
+  <p class="note" style="text-align:center; font-size:17px;">
+    All-in • <$1K • One trade • Batch 50 • No perfection
+  </p>
+
+  <h2>✅ CORE PHILOSOPHY</h2>
+  <div class="rule">
+    Trade <strong>volatility engines in structured recovery</strong>.<br>
+    Not trends. Not traps. Not slow coins.<br>
+    Risk is taken — but calibrated.<br>
+    Good enough with structure wins.
+  </div>
+
+  <h2>🔍 SCANNING FLOW (Two Steps)</h2>
+  
+  <div class="step">
+    <strong>Step 1: Pre-Filter (Once/Day)</strong><br>
+    • BTC stable? (24h change = −3% to +3%) → if not, skip all<br>
+    • Exclude forever: BTC, ETH, BNB, XRP<br>
+    • Keep only: volume ≥$2M, volatility ≥2.5%, futures on Bybit<br>
+    → Result: ~155 high-quality coins
+  </div>
+
+  <div class="step">
+    <strong>Step 2: Real-Time Scan (Every 15–30m)</strong><br>
+    • Run Recovery Mode logic on all 155<br>
+    • Apply Safety Clause<br>
+    • Output ONLY if ≥75 score AND valid
+  </div>
+
+  <h2>📊 RECOVERY MODE (Long Grids Only)</h2>
+  <p>Deploy ONLY if <strong>ALL</strong> true:</p>
+  <ul>
+    <li>Big flush: ≥15% drop in 48h</li>
+    <li>Dip compression: current dip = 2.5%–8%</li>
+    <li>No new low: price > crash low for ≥6h</li>
+    <li>Support held: ≥1 candle close + volume</li>
+    <li>Momentum pause: MACD histogram ≥ previous</li>
+    <li>Liquidity: volume ≥ $3M</li>
+    <li>BTC gate passed (±3%)</li>
+  </ul>
+
+  <h2>⚖️ LEVERAGE</h2>
+  <p>
+    <span class="leverage x5">x5</span> Strong setup (vol ≥5%, time ≥90m)<br>
+    <span class="leverage x3">x3</span> Good setup (minor flaw)<br>
+    <span class="leverage x2">x2</span> Weak-but-volatile (high-vol coin only)<br>
+    <span class="note">❌ No x1, x4, x10 in Phase 1</span>
+  </p>
+
+  <h2>🔒 EXECUTION SAFETY CLAUSE</h2>
+  <div class="rule">
+    If price returns to support zone in &lt;90 mins<br>
+    AND no higher low formed → <strong>ABORT</strong><br>
+    → Show: ❌ TRAP — WAIT<br>
+    → <strong>No other signals until reset</strong>
+  </div>
+
+  <h2>🥇 OUTPUT FORMAT</h2>
+  <div class="output">
+    🟢 COIN xL<br>
+    Low–High | SL Stop
+  </div>
+  <p class="note">Example: 🟢 ZEN x5<br>8.39–8.90 | SL 8.35</p>
+  <p class="note">No signal? → Capital idle. Wait.</p>
+
+  <h2>📝 BATCH 50 & LEARNING</h2>
+  <ul>
+    <li>Each deployed grid = 1 trade in Batch 50</li>
+    <li>Log: coin, leverage, PnL, outcome</li>
+    <li><strong>Do not change rules until 50 trades</strong></li>
+    <li>Passive learning only — bot never auto-adjusts</li>
+  </ul>
+
+  <hr>
+  <p class="note" style="text-align:center; font-size:18px; margin-top:10px;">
+    v1.0 LOCKED • SCAN ALL • ACT ONCE • EXECUTE
+  </p>
+
+</body>
+</html>
