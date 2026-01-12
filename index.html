@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Phase 1 Live Flash / Grid Scanner</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #000;
+      color: #fff;
+      padding: 16px;
+      font-size: 18px;
+    }
+    h1 { text-align:center; color:#4ade80; margin-bottom:8px; }
+    .status { text-align:center; color:#93c5fd; margin-bottom:12px; }
+    .coin-block {
+      background:#111;
+      padding:16px;
+      border-left:4px solid #4ade80;
+      margin:12px 0;
+      border-radius:8px;
+    }
+    .label {
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:6px;
+      font-weight:bold;
+      margin-right:8px;
+    }
+    .flash { background:#1e3a8a; color:#60a5fa; }
+    .grid { background:#3b1f0f; color:#f87171; }
+    .x5 { background:#dc2626; color:#fff; padding:2px 6px; border-radius:4px;}
+    .x3 { background:#fbbf24; color:#000; padding:2px 6px; border-radius:4px;}
+    .x2 { background:#3b82f6; color:#fff; padding:2px 6px; border-radius:4px;}
+    .small { font-size:16px; color:#a0aec0; }
+  </style>
+</head>
+<body>
+
+<h1>📊 Phase 1 Live Flash / Grid Scanner</h1>
+<div class="status" id="status">Initializing...</div>
+<div id="results"></div>
+
+<script>
+const API_TICKERS = "https://api.bybit.com/v5/market/tickers?category=linear";
+const API_KLINES = "https://api.bybit.com/v5/market/kline?category=linear";
+
+const EXCLUDE = ["BTCUSDT","ETHUSDT","BNBUSDT","XRPUSDT"];
+const BATCH_SIZE = 50;
+const MIN_FLUSH = 15;
+const MIN_DIP = 2.5;
+const MAX_DIP = 8;
+const MIN_VOL = 3_000_000;
+const SCORE_MIN = 75;
+
+// EMA helpers
+function ema(values, period){
+  const k = 2/(period+1);
+  let e = values[0];
+  for(let i=1;i<values.length;i++){
+    e = values[i]*k + e*(1-k);
+  }
+  return e;
+}
+
+function macdHistogram(closes){
+  const ema12 = ema(closes, 12);
+  const ema26 = ema(closes, 26);
+  const macdLine = closes.map((v,i)=>ema12 - ema26);
+  const signal = ema(macdLine, 9);
+  return macdLine.map(v=>v - signal);
+}
+
+// Score helpers
+function calcScore({flushPct, volume, dip, macdDelta, timeAboveSupport}){
+  let score = 0;
+  score += Math.min(flushPct,30);
+  score += Math.min(volume / 1e6, 30);
+  score += dip;
+  score += Math.max(0, macdDelta*100);
+  score += Math.min(timeAboveSupport/90*10,10);
+  return Math.round(score);
+}
+
+// Fetch tickers
+async function fetchTickers(){
+  const res = await fetch(API_TICKERS);
+  const json = await res.json();
+  return json.result.list.filter(t=>t.symbol.endsWith("USDT") && !EXCLUDE.includes(t.symbol));
+}
+
+// Fetch candles
+async function fetchKlines(symbol){
+  const now = Math.floor(Date.now()/1000);
+  const start = now - 48*60*60;
+  const url = `${API_KLINES}&symbol=${symbol}&interval=15&start=${start}&limit=200`;
+  const res = await fetch(url);
+  const json = await res.json();
+  return json.result;
+}
+
+// Decide Flash vs Grid
+function labelMode(ema7,ema25,ema99){
+  if (Math.abs(ema7-ema25) < ema7*0.002 && Math.abs(ema25-ema99) < ema25*0.002){
+    return "GRID";
+  } else {
+    return "FLASH";
+  }
+}
+
+// Main scan
+async function runScan(){
+  document.getElementById("status").innerText = "Fetching tickers…";
+  const tickers = await fetchTickers();
+  let coins = tickers.map(t=>t.symbol);
+
+  document.getElementById("status").innerText = `Scanning ${coins.length} coins…`;
+
+  let results = [];
+
+  for(let i=0;i<coins.length;i+=BATCH_SIZE){
+    const batch = coins.slice(i, i+BATCH_SIZE);
+    document.getElementById("status").innerText = `Batch ${i/BATCH_SIZE+1} scanning…`;
+
+    for(const sym of batch){
+      try{
+        const ticker = tickers.find(t=>t.symbol===sym);
+        const klines = await fetchKlines(sym);
+
+        const closes = klines.map(c=>+c.close);
+        const highs = klines.map(c=>+c.high);
+        const lows = klines.map(c=>+c.low);
+        const vols = klines.map(c=>+c.volume * +c.close);
+
+        if(closes.length < 50) continue;
+
+        const high48 = Math.max(...closes.slice(-192));
+        const low48 = Math.min(...closes.slice(-192));
+        const flushPct = (high48 - low48)/high48*100;
+        if(flushPct < MIN_FLUSH) continue;
+
+        const last = closes.at(-1);
+        const dip = (high48 - last)/high48*100;
+        if(dip < MIN_DIP || dip > MAX_DIP) continue;
+
+        const low6h = Math.min(...closes.slice(-24));
+        if(low6h <= low48) continue;
+
+        const vol24h = vols.slice(-96).reduce((a,b)=>a+b,0);
+        if(vol24h < MIN_VOL) continue;
+
+        const hist = macdHistogram(closes);
+        const macdDelta = hist.at(-1) - hist.at(-2);
+        if(macdDelta < 0) continue;
+
+        const timeAboveSupport = closes.slice().reverse().findIndex(v=>v <= low48)*15;
+
+        const score = calcScore({flushPct, volume:vol24h, dip, macdDelta, timeAboveSupport});
+        if(score < SCORE_MIN) continue;
+
+        const ema7 = ema(closes.slice(-7),7);
+        const ema25 = ema(closes.slice(-25),25);
+        const ema99 = ema(closes.slice(-99),99);
+        const mode = labelMode(ema7,ema25,ema99);
+
+        let leverage="x2";
+        if(mode==="FLASH"){
+          if(score>=85) leverage="x3";
+          else leverage="x2";
+        } else {
+          if(score>=85) leverage="x5";
+          else if(score>=80) leverage="x3";
+          else leverage="x2";
+        }
+
+        let rangeLow = low48.toFixed(4);
+        let rangeHigh = (mode==="GRID" ? (low48 * 1.10).toFixed(4) : "");
+        let stopLoss = (low48 * 0.995).toFixed(4);
+        let tp = "";
+        if(mode==="FLASH"){
+          tp = (last * 1.10).toFixed(4);
+        }
+
+        results.push({sym,mode,leverage,rangeLow,rangeHigh,stopLoss,tp,score});
+
+        await new Promise(r=>setTimeout(r,150));
+      } catch(e){continue;}
+    }
+  }
+
+  results.sort((a,b)=>b.score-a.score);
+  displayResults(results);
+}
+
+// UI update
+function displayResults(arr){
+  document.getElementById("status").innerText = `Scan complete — ${arr.length} actionable`;
+
+  const div = document.getElementById("results");
+  div.innerHTML = "";
+
+  if(arr.length===0){
+    div.innerHTML = `<div class="coin-block"><span class="small">No actionable signals — wait</span></div>`;
+    return;
+  }
+
+  arr.forEach((c,i) => {
+    div.innerHTML += `
+      <div class="coin-block">
+        <div>
+          <span class="label ${c.mode.toLowerCase()}">${c.mode}</span>
+          <span class="${c.leverage}">${c.leverage}</span>
+        </div>
+        <strong>${c.sym}</strong><br>
+        ${c.mode === "GRID"
+          ? `Range: ${c.rangeLow} – ${c.rangeHigh}<br>`
+          : ""}
+        Stop: ${c.stopLoss}<br>
+        ${c.mode === "FLASH" ? `TP: ${c.tp}<br>` : ""}
+        Score: ${c.score}
+      </div>
+    `;
+  });
+}
+
+// Run
+runScan();
+</script>
+
+</body>
+</html>
