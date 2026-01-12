@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Phase 1 Live Recovery Scanner</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  background:#000;
+  color:#fff;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont;
+  padding:16px;
+  font-size:18px;
+}
+h1 {
+  color:#4ade80;
+  text-align:center;
+  margin-bottom:10px;
+}
+button {
+  width:100%;
+  padding:14px;
+  font-size:20px;
+  background:#4ade80;
+  border:none;
+  border-radius:8px;
+  margin-bottom:14px;
+}
+#status {
+  color:#93c5fd;
+  margin-bottom:12px;
+  text-align:center;
+}
+.signal {
+  border:2px solid #4ade80;
+  padding:14px;
+  border-radius:10px;
+  margin-bottom:14px;
+}
+.bad {
+  color:#888;
+}
+.rank {
+  color:#facc15;
+}
+.small {
+  font-size:15px;
+  color:#9ca3af;
+}
+</style>
+</head>
+
+<body>
+
+<h1>📡 Phase 1 Live Scanner</h1>
+
+<button onclick="startScan()">▶ RUN SCAN</button>
+
+<div id="status">Idle</div>
+<div id="results"></div>
+
+<script>
+const API = "https://api.bybit.com";
+const EXCLUDE = ["BTCUSDT","ETHUSDT","BNBUSDT","XRPUSDT"];
+const BATCH_SIZE = 50;
+
+let symbols = [];
+let batchIndex = 0;
+let results = [];
+
+async function startScan() {
+  document.getElementById("results").innerHTML = "";
+  document.getElementById("status").innerText = "Fetching universe...";
+  results = [];
+  batchIndex = 0;
+  await loadUniverse();
+  await scanNextBatch();
+}
+
+async function loadUniverse() {
+  const res = await fetch(`${API}/v5/market/tickers?category=linear`);
+  const data = await res.json();
+  symbols = data.result.list
+    .map(x => x.symbol)
+    .filter(s => s.endsWith("USDT") && !EXCLUDE.includes(s));
+}
+
+async function scanNextBatch() {
+  if (batchIndex * BATCH_SIZE >= symbols.length) {
+    finalizeResults();
+    return;
+  }
+
+  const batch = symbols.slice(batchIndex * BATCH_SIZE, (batchIndex + 1) * BATCH_SIZE);
+  document.getElementById("status").innerText =
+    `Scanning batch ${batchIndex + 1} / ${Math.ceil(symbols.length / BATCH_SIZE)}`;
+
+  for (let sym of batch) {
+    try {
+      await scanCoin(sym);
+    } catch {}
+  }
+
+  batchIndex++;
+  setTimeout(scanNextBatch, 1200); // rate limit safety
+}
+
+async function scanCoin(symbol) {
+  const kRes = await fetch(`${API}/v5/market/kline?category=linear&symbol=${symbol}&interval=15&limit=200`);
+  const kData = await kRes.json();
+  const klines = kData.result.list.map(k => ({
+    time:+k[0],
+    open:+k[1],
+    high:+k[2],
+    low:+k[3],
+    close:+k[4],
+    volume:+k[5]
+  })).reverse();
+
+  if (klines.length < 100) return;
+
+  const closes = klines.map(k => k.close);
+  const volumes = klines.map(k => k.volume);
+
+  // --- MACD 12-26-9 ---
+  const ema12 = EMA(closes,12);
+  const ema26 = EMA(closes,26);
+  const macd = ema12.map((v,i)=>v-ema26[i]);
+  const signal = EMA(macd,9);
+  const hist = macd.map((v,i)=>v-signal[i]);
+  const histDelta = hist.at(-1) - hist.at(-2);
+  if (histDelta < 0) return;
+
+  // --- BIG FLUSH ---
+  const high48h = Math.max(...closes.slice(-192));
+  const low48h = Math.min(...closes.slice(-192));
+  const flushPct = (high48h - low48h) / high48h * 100;
+  if (flushPct < 15) return;
+
+  // --- DIP COMPRESSION ---
+  const last = closes.at(-1);
+  const dip = (last - low48h) / low48h * 100;
+  if (dip < 2.5 || dip > 8) return;
+
+  // --- NO NEW LOW 6H ---
+  const low6h = Math.min(...closes.slice(-24));
+  if (low6h <= low48h) return;
+
+  // --- VOLUME ---
+  const vol24h = volumes.slice(-96).reduce((a,b)=>a+b,0);
+  if (vol24h < 3_000_000) return;
+
+  // --- SCORE ---
+  const score =
+    flushPct * 2 +
+    histDelta * 100 +
+    Math.min(vol24h / 5_000_000 * 10, 20);
+
+  if (score < 75) return;
+
+  results.push({
+    symbol,
+    price:last,
+    dip:dip.toFixed(2),
+    flush:flushPct.toFixed(1),
+    score:score.toFixed(0)
+  });
+}
+
+function finalizeResults() {
+  document.getElementById("status").innerText = "Scan complete";
+
+  if (results.length === 0) {
+    document.getElementById("results").innerHTML =
+      `<div class="bad">No actionable setups. Stay idle.</div>`;
+    return;
+  }
+
+  results.sort((a,b)=>b.score-a.score);
+
+  document.getElementById("results").innerHTML =
+    results.map((r,i)=>`
+      <div class="signal">
+        <div class="rank">#${i+1} — ${r.symbol}</div>
+        <div>💰 Price: ${r.price}</div>
+        <div>📉 Flush: ${r.flush}%</div>
+        <div>🔁 Dip: ${r.dip}%</div>
+        <div>⭐ Score: ${r.score}</div>
+      </div>
+    `).join("");
+}
+
+function EMA(arr, period) {
+  const k = 2 / (period + 1);
+  let ema = [arr[0]];
+  for (let i = 1; i < arr.length; i++) {
+    ema.push(arr[i] * k + ema[i - 1] * (1 - k));
+  }
+  return ema;
+}
+</script>
+
+</body>
+</html>
