@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 1 - 7-Coin Universe</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin:0; padding:16px; line-height:1.5; background:#fff; color:#000; }
+  .container { max-width: 800px; margin: 0 auto; }
+  h1 { text-align:center; font-size:32px; margin-bottom:16px; }
+  .rules-banner { background:#fef3c7; padding:12px; border-radius:8px; margin-bottom:16px; font-weight:600; }
+  .coin-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:600px){ .coin-grid { grid-template-columns:1fr; } }
+  .coin-card { border:2px solid #000; border-radius:12px; padding:16px; text-align:center; font-size:18px; }
+  .coin-name { font-weight:700; font-size:20px; margin-bottom:12px; }
+  .btn { display:block; width:100%; padding:14px; margin:8px 0; border:none; border-radius:10px; font-size:20px; font-weight:700; text-decoration:none; }
+  .grid-btn { background:#10b981; color:#fff; }
+  .flash-btn { background:#f59e0b; color:#000; }
+  .footer { text-align:center; margin-top:24px; font-size:16px; color:#555; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🚀 Phase 1 - 7-Coin Universe</h1>
+
+  <div class="rules-banner">
+    ✅ Grid: x3 | Flash: x3<br>
+    ⚠️ Flash only if: RSI(15m)≤30 + Vol≥$15M + ≥8% dip
+  </div>
+
+  <div class="coin-grid">
+    <!-- PEPE -->
+    <div class="coin-card">
+      <div class="coin-name">1000PEPEUSDT</div>
+      <a href="https://www.bybit.com/en/trade/futures/1000PEPEUSDT?leverage=3&type=grid" class="btn grid-btn" onclick="alert('✅ Grid: Price in range?\nEMA flat?\nVol ≥$10M?');">📊 Grid x3</a>
+      <a href="https://www.bybit.com/en/trade/futures/1000PEPEUSDT?leverage=3" class="btn flash-btn" onclick="alert('✅ Flash: RSI≤30?\nVol≥$15M?\nDip≥8%?');">⚡ Flash x3</a>
+    </div>
+
+    <!-- DOGE -->
+    <div class="coin-card">
+      <div class="coin-name">DOGEUSDT</div>
+      <a href="https://www.bybit.com/en/trade/futures/DOGEUSDT?leverage=3&type=grid" class="btn grid-btn" onclick="alert('✅ Grid: Price in range?\nEMA flat?\nVol ≥$10M?');">📊 Grid x3</a>
+      <a href="https://www.bybit.com/en/trade/futures/DOGEUSDT?leverage=3" class="btn flash-btn" onclick="alert('✅ Flash: RSI≤30?\nVol≥$15M?\nDip≥8%?');">⚡ Flash x3</a>
+    </div>
+
+    <!-- ATOM -->
+    <div class="coin-card">
+      <div class="coin-name">ATOMUSDT</div>
+      <a href="https://www.bybit.com/en/trade/futures/ATOMUSDT?leverage=3" class="btn flash-btn" onclick="alert('✅ Flash: RSI≤30?\nVol≥$15M?\nDip≥8%?');">⚡ Flash x3</a>
+    </div>
+
+    <!-- NEAR -->
+    <div class="coin-card">
+      <div class="coin-name">NEARUSDT</div>
+      <a href="https://www.bybit.com/en/trade/futures/NEARUSDT?leverage=3" class="btn flash-btn" onclick="alert('✅ Flash: RSI≤30?\nVol≥$15M?\nDip≥8%?');">⚡ Flash x3</a>
+    </div>
+
+    <!-- ZEN -->
+    <div class="coin-card">
+      <div class="coin-name">ZENUSDT</div>
+      <a href="https://www.bybit.com/en/trade/futures/ZENUSDT?leverage=3" class="btn flash-btn" onclick="alert('✅ Flash: RSI≤30?\nVol≥$15M?\nDip≥8%?');">⚡ Flash x3</a>
+    </div>
+
+    <!-- TIA -->
+    <div class="coin-card">
+      <div class="coin-name">TIAUSDT</div>
+      <a href="https://www.bybit.com/en/trade/futures/TIAUSDT?leverage=3" class="btn flash-btn" onclick="alert('✅ Flash: RSI≤30?\nVol≥$15M?\nDip≥8%?');">⚡ Flash x3</a>
+    </div>
+
+    <!-- SUI -->
+    <div class="coin-card">
+      <div class="coin-name">SUIUSDT</div>
+      <a href="https://www.bybit.com/en/trade/futures/SUIUSDT?leverage=3" class="btn flash-btn" onclick="alert('⚠️ SUI: Check Vol ≥$15M!\nRSI≤30?\nDip≥8%?');">⚡ Flash x3</a>
+    </div>
+  </div>
+
+  <div class="footer">
+    🔒 Phase 1: Capital < $1,000 • x3 max<br>
+    🚫 No trade without ALL signals green<br>
+    💡 Exit Flash if RSI >70 or -50% drawdown
+  </div>
+</div>
+</body>
+</html>
