@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 1 - Grid + Flash Scanner (15m)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin:0; padding:16px; line-height:1.5; background:#fff; color:#000; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { text-align:center; font-size:32px; margin-bottom:16px; }
+  #scanBtn { display:block; margin:0 auto 20px auto; padding:14px 24px; font-size:22px; font-weight:700; background:#2563eb; color:#fff; border:none; border-radius:12px; cursor:pointer; }
+  .coin-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:600px){ .coin-grid { grid-template-columns:1fr; } }
+  .coin-card { border:2px solid #000; border-radius:12px; padding:16px; text-align:center; font-size:18px; }
+  .coin-name { font-weight:700; font-size:20px; margin-bottom:12px; }
+  .status-strong { background:#10b981; color:#fff; padding:6px 12px; border-radius:6px; font-weight:700; }
+  .status-wait { background:#3b82f6; color:#fff; padding:6px 12px; border-radius:6px; font-weight:700; }
+  .footer { text-align:center; margin-top:24px; font-size:16px; color:#555; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚡ Phase 1 - Grid + Flash Scanner (15m)</h1>
+  <button id="scanBtn">🔄 Scan All Coins</button>
+
+  <div class="coin-grid" id="coinGrid">
+    <!-- Results appear here -->
+  </div>
+
+  <div class="footer">
+    🔒 Phase 1: $0 → $1,000 • x3 max<br>
+    💡 Grid: PEPE/DOGE/LTC | Flash: All | Vol ≥ $15M
+  </div>
+</div>
+
+<script>
+const coins = ["1000PEPEUSDT","DOGEUSDT","ATOMUSDT","NEARUSDT","ZENUSDT","TIAUSDT","LTCUSDT"];
+const coinGrid = document.getElementById("coinGrid");
+const scanBtn = document.getElementById("scanBtn");
+
+function calculateRSI(closes, period = 14){
+  let gains = 0, losses = 0;
+  for(let i = 1; i < closes.length; i++){
+    let diff = closes[i] - closes[i-1];
+    if(diff > 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  if(avgLoss === 0) return 100;
+  let rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+async function scanCoin(symbol){
+  try{
+    const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=15&limit=20`;
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    if(!data.result?.list || data.result.list.length < 2) return null;
+
+    const klines = data.result.list.map(k => ({
+      high: parseFloat(k[2]),
+      low: parseFloat(k[3]),
+      close: parseFloat(k[4]),
+      volume: parseFloat(k[5])
+    })).reverse();
+
+    const closes = klines.map(k => k.close);
+    const volumes = klines.map(k => k.volume);
+    const latestClose = closes[closes.length - 1];
+    const prevHigh = Math.max(...closes.slice(0, -1));
+    const dipPercent = ((prevHigh - latestClose) / prevHigh) * 100;
+    const totalVolume = volumes.reduce((a,b) => a + b, 0);
+    const rsi = calculateRSI(closes);
+
+    // Get recent range (for context)
+    const rangeLow = Math.min(...klines.map(k => k.low));
+    const rangeHigh = Math.max(...klines.map(k => k.high));
+
+    // Only PEPE, DOGE, LTC can grid
+    const canGrid = ["1000PEPEUSDT", "DOGEUSDT", "LTCUSDT"].includes(symbol);
+    const gridPass = canGrid && totalVolume >= 10_000_000;
+
+    // Flash for all
+    const flashPass = rsi <= 30 && totalVolume >= 15_000_000 && dipPercent >= 8;
+
+    let status = "WAIT";
+    if (gridPass && flashPass) status = "Grid + Flash";
+    else if (gridPass) status = "Grid x3";
+    else if (flashPass) status = "Flash x3";
+
+    return {
+      symbol,
+      price: latestClose,
+      rangeLow,
+      rangeHigh,
+      rsi: rsi.toFixed(1),
+      volume: totalVolume,
+      dip: dipPercent.toFixed(1),
+      status
+    };
+  }catch(e){
+    console.error("Scan error:", symbol, e);
+    return null;
+  }
+}
+
+async function scanAll(){
+  scanBtn.disabled = true;
+  coinGrid.innerHTML = "<p>Scanning coins...</p>";
+  const results = await Promise.all(coins.map(scanCoin));
+  coinGrid.innerHTML = "";
+  const valid = results.filter(r => r);
+
+  if(valid.length === 0){
+    coinGrid.innerHTML = "<p>No coins meet criteria right now.</p>";
+    scanBtn.disabled = false;
+    return;
+  }
+
+  valid.forEach(c => {
+    const card = document.createElement("div");
+    card.className = "coin-card";
+    let statusClass = c.status === "WAIT" ? "status-wait" : "status-strong";
+    const volDisplay = (c.volume / 1e6).toFixed(1) + "M";
+    const priceDisplay = c.symbol.includes("1000PEPE") 
+      ? c.price.toFixed(7) 
+      : c.symbol.includes("DOGE") 
+        ? c.price.toFixed(4) 
+        : c.price.toFixed(3);
+    card.innerHTML = `
+      <div class="coin-name">${c.symbol}</div>
+      <p>Price: ${priceDisplay}</p>
+      <p>Range: ${c.rangeLow.toFixed(3)} – ${c.rangeHigh.toFixed(3)}</p>
+      <p>RSI: ${c.rsi} | Vol: ${volDisplay} | Dip: ${c.dip}%</p>
+      <span class="${statusClass}">${c.status}</span>
+    `;
+    coinGrid.appendChild(card);
+  });
+
+  scanBtn.disabled = false;
+}
+
+scanBtn.addEventListener("click", scanAll);
+</script>
+</body>
+</html>
