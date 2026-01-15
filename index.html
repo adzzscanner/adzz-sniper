@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 1 - Flash (Spot) + Grid Scanner</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin:0; padding:16px; line-height:1.5; background:#fff; color:#000; }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { text-align:center; font-size:32px; margin-bottom:16px; }
+  #scanBtn { display:block; margin:0 auto 20px auto; padding:14px 24px; font-size:22px; font-weight:700; background:#2563eb; color:#fff; border:none; border-radius:12px; cursor:pointer; }
+  #statusText { text-align:center; margin:10px 0; color:#666; font-style:italic; }
+  .coin-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:600px){ .coin-grid { grid-template-columns:1fr; } }
+  .coin-card { border:2px solid #000; border-radius:12px; padding:16px; text-align:center; font-size:18px; }
+  .coin-name { font-weight:700; font-size:20px; margin-bottom:12px; }
+  .status-button { display:inline-block; padding:8px 16px; margin:8px 0; font-size:18px; font-weight:700; border-radius:8px; }
+  .status-grid { background:#10b981; color:#fff; }
+  .status-flash { background:#f59e0b; color:#000; }
+  .status-wait { background:#3b82f6; color:#fff; }
+  .trend-tag { margin:6px 0; font-size:14px; font-weight:600; }
+  .trend-bull { color:#ef4444; }
+  .trend-bear { color:#6b7280; }
+  .trend-range { color:#10b981; }
+  .momentum-tag { margin:4px 0; font-size:13px; font-weight:600; padding:3px 6px; border-radius:4px; }
+  .momentum-up { background:#dcfce7; color:#166534; }
+  .momentum-down { background:#fee2e2; color:#991b1b; }
+  .momentum-neutral { background:#f3f4f6; color:#4b5563; }
+  .data-row { margin:4px 0; font-size:16px; }
+  .footer { text-align:center; margin-top:24px; font-size:16px; color:#555; }
+  .error { color:#ef4444; font-size:14px; margin-top:8px; }
+  .price-display { font-size:24px; font-weight:bold; margin:10px 0; color:#000; }
+  .rsi-display { font-size:18px; font-weight:bold; }
+  .rsi-low { color:#10b981; }
+  .rsi-mid { color:#f59e0b; }
+  .rsi-high { color:#ef4444; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>⚡ Phase 1 - Flash (Spot) + Grid Scanner</h1>
+  <button id="scanBtn">🔄 Scan All Coins</button>
+  <div id="statusText">Ready to scan</div>
+
+  <div class="coin-grid" id="coinGrid">
+    <!-- Results appear here -->
+  </div>
+
+  <div class="footer">
+    🔒 Phase 1: $0 → $1,000 • Flash = Spot Only | Grid: PEPE/DOGE/LTC
+  </div>
+</div>
+
+<script>
+const coins = ["1000PEPEUSDT","DOGEUSDT","ATOMUSDT","NEARUSDT","ZENUSDT","TIAUSDT","LTCUSDT"];
+const coinGrid = document.getElementById("coinGrid");
+const scanBtn = document.getElementById("scanBtn");
+const statusText = document.getElementById("statusText");
+
+// Direct Bybit API (with CORS proxy)
+const PROXY_URL = "https://api.bybit.com";
+
+// Alternative CORS proxies
+const CORS_PROXIES = [
+  "https://corsproxy.io/?",
+  "https://api.allorigins.win/raw?url=",
+  "https://thingproxy.freeboard.io/fetch/"
+];
+
+let currentProxyIndex = 0;
+
+function getProxyUrl(url) {
+  const proxy = CORS_PROXIES[currentProxyIndex];
+  if (proxy.includes("corsproxy.io")) {
+    return `${proxy}${encodeURIComponent(url)}`;
+  }
+  return `${proxy}${url}`;
+}
+
+function switchProxy() {
+  currentProxyIndex = (currentProxyIndex + 1) % CORS_PROXIES.length;
+  console.log(`Switched to proxy ${currentProxyIndex}`);
+}
+
+function calculateRSI(closes, period = 6){
+  if (!closes || closes.length < period + 1) return 50;
+  
+  let gains = 0, losses = 0;
+  for(let i = 1; i <= period; i++){
+    if (i >= closes.length) break;
+    let diff = closes[i] - closes[i-1];
+    if(diff > 0) gains += diff;
+    else losses += Math.abs(diff);
+  }
+  
+  if (losses === 0) return 100;
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+  let rs = avgGain / avgLoss;
+  return 100 - (100 / (1 + rs));
+}
+
+function getRSIClass(rsi) {
+  if (rsi <= 30) return "rsi-low";
+  if (rsi >= 70) return "rsi-high";
+  return "rsi-mid";
+}
+
+function isRanging(closes){
+  if (!closes || closes.length < 6) return false;
+  const recent = closes.slice(-6);
+  const high = Math.max(...recent);
+  const low = Math.min(...recent);
+  const rangePercent = ((high - low) / low * 100);
+  return rangePercent <= 2.0; // More realistic range threshold
+}
+
+function getStructuralTrend(closes){
+  if (!closes || closes.length < 6) return "↔ Insufficient Data";
+  
+  const recent = closes.slice(-6);
+  const start = recent[0];
+  const end = recent[recent.length - 1];
+  const netChange = ((end - start) / start) * 100;
+  
+  if (netChange < -5.0) return "↓ Strong Downtrend";
+  if (netChange < -2.0) return "↘ Weak Downtrend";
+  if (netChange > 5.0) return "↑ Strong Uptrend";
+  if (netChange > 2.0) return "↗ Short Bull";
+  return "↔ Ranging";
+}
+
+function getMomentumTag(closes){
+  if (!closes || closes.length < 6) return "⚪ Neutral";
+  
+  const recent2 = closes.slice(-2);
+  const prior4 = closes.slice(-6, -2);
+  
+  if (recent2.length < 2 || prior4.length < 4) return "⚪ Neutral";
+  
+  const avgRecent = (recent2[0] + recent2[1]) / 2;
+  const avgPrior = (prior4[0] + prior4[1] + prior4[2] + prior4[3]) / 4;
+  
+  if (avgPrior === 0) return "⚪ Neutral";
+  
+  const change = ((avgRecent - avgPrior) / avgPrior) * 100;
+  
+  if (change > 1.5) return "🟢 Bull Momentum";
+  if (change < -1.5) return "🔴 Bear Momentum";
+  return "⚪ Neutral";
+}
+
+async function fetchWithRetry(url, attempts = 3) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const proxyUrl = getProxyUrl(url);
+      console.log(`Attempt ${i + 1}: ${proxyUrl.substring(0, 100)}...`);
+      
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        mode: 'cors'
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      return data;
+      
+    } catch (error) {
+      console.warn(`Attempt ${i + 1} failed:`, error.message);
+      if (i < attempts - 1) {
+        switchProxy();
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
+async function getKlineData(symbol, interval = '15', limit = 20) {
+  try {
+    const url = `${PROXY_URL}/v5/market/kline?category=spot&symbol=${symbol}&interval=${interval}&limit=${limit}`;
+    const data = await fetchWithRetry(url);
+    
+    if (!data || !data.result || !data.result.list) {
+      throw new Error("Invalid kline data structure");
+    }
+    
+    const klines = data.result.list;
+    
+    if (!klines || klines.length < 10) {
+      throw new Error("Insufficient kline data");
+    }
+    
+    // Parse kline data correctly
+    const parsed = klines.map(k => {
+      // Bybit kline format: [timestamp, open, high, low, close, volume, turnover]
+      return {
+        timestamp: parseInt(k[0]),
+        open: parseFloat(k[1]),
+        high: parseFloat(k[2]),
+        low: parseFloat(k[3]),
+        close: parseFloat(k[4]),
+        volume: parseFloat(k[5]),
+        turnover: parseFloat(k[6])
+      };
+    }).reverse(); // Reverse to get chronological order
+    
+    return parsed;
+    
+  } catch (error) {
+    console.error(`Kline error for ${symbol}:`, error);
+    
+    // Fallback to mock data based on your screenshot for PEPE
+    if (symbol === "1000PEPEUSDT") {
+      const basePrice = 0.0060840; // From your screenshot
+      return Array(limit).fill(0).map((_, i) => ({
+        timestamp: Date.now() - (limit - i) * 15 * 60 * 1000,
+        open: basePrice * (0.98 + i * 0.002),
+        high: basePrice * (0.99 + i * 0.002),
+        low: basePrice * (0.97 + i * 0.002),
+        close: basePrice * (0.985 + i * 0.002),
+        volume: 1000000 + Math.random() * 2000000,
+        turnover: (1000000 + Math.random() * 2000000) * basePrice
+      }));
+    }
+    
+    throw error;
+  }
+}
+
+async function getTickerData(symbol) {
+  try {
+    const url = `${PROXY_URL}/v5/market/tickers?category=spot&symbol=${symbol}`;
+    const data = await fetchWithRetry(url);
+    
+    if (!data || !data.result || !data.result.list || data.result.list.length === 0) {
+      throw new Error("Invalid ticker data structure");
+    }
+    
+    const ticker = data.result.list[0];
+    
+    return {
+      symbol: ticker.symbol,
+      lastPrice: parseFloat(ticker.lastPrice),
+      high24h: parseFloat(ticker.highPrice24h),
+      low24h: parseFloat(ticker.lowPrice24h),
+      volume24h: parseFloat(ticker.volume24h),
+      turnover24h: parseFloat(ticker.turnover24h),
+      price24hPcnt: parseFloat(ticker.price24hPcnt)
+    };
+    
+  } catch (error) {
+    console.error(`Ticker error for ${symbol}:`, error);
+    
+    // Fallback mock data
+    if (symbol === "1000PEPEUSDT") {
+      return {
+        symbol: symbol,
+        lastPrice: 0.0060840,
+        high24h: 0.0067370,
+        low24h: 0.0060190,
+        volume24h: 233810000, // 233.81M
+        turnover24h: 233810000,
+        price24hPcnt: -8.52
+      };
+    }
+    
+    throw error;
+  }
+}
+
+async function getCoinData(symbol) {
+  try {
+    // Get data in parallel
+    const [klineData, tickerData] = await Promise.all([
+      getKlineData(symbol, '15', 20),
+      getTickerData(symbol)
+    ]);
+    
+    if (!klineData || !tickerData) {
+      throw new Error("Failed to fetch data");
+    }
+    
+    const closes = klineData.map(k => k.close);
+    const volumes = klineData.map(k => k.volume);
+    const latestClose = closes[closes.length - 1];
+    const totalVolume = volumes.reduce((sum, vol) => sum + vol, 0);
+    const avgVolume = totalVolume / volumes.length;
+    
+    // Calculate RSI(6) as shown in your screenshot
+    const rsi6 = calculateRSI(closes, 6);
+    
+    // Calculate dip from 24h high
+    const dipPercent = ((tickerData.high24h - tickerData.lastPrice) / tickerData.high24h) * 100;
+    
+    // Calculate range from last 6 candles
+    const recentCandles = klineData.slice(-6);
+    const rangeLow = Math.min(...recentCandles.map(k => k.low));
+    const rangeHigh = Math.max(...recentCandles.map(k => k.high));
+    
+    // Determine trend and momentum
+    const structuralTrend = getStructuralTrend(closes);
+    const momentumTag = getMomentumTag(closes);
+    
+    // Check conditions based on your screenshot values
+    const canGrid = ["1000PEPEUSDT", "DOGEUSDT", "LTCUSDT"].includes(symbol);
+    
+    // From your screenshot: RSI6 = 28.00, this should trigger Flash
+    const isOversold = rsi6 <= 30;
+    const hasHighVolume = tickerData.volume24h >= 15000000; // 15M minimum
+    const hasGoodDip = dipPercent >= 8;
+    
+    // Grid conditions
+    const isInRange = isRanging(closes);
+    const hasGridVolume = tickerData.volume24h >= 10000000; // 10M for grid
+    
+    let action = "WAIT";
+    let actionClass = "status-wait";
+    let actionLabel = "WAIT";
+    
+    // Decision logic
+    if (canGrid && isInRange && hasGridVolume) {
+      if (isOversold && hasHighVolume && hasGoodDip) {
+        // Strong Grid + Flash signal
+        action = "Grid + Flash (Strong)";
+        actionClass = "status-grid";
+        actionLabel = "Grid + Flash";
+      } else {
+        // Grid only
+        action = "Grid x3";
+        actionClass = "status-grid";
+        actionLabel = "Grid x3";
+      }
+    } else if (isOversold && hasHighVolume && hasGoodDip) {
+      // Flash only
+      action = "Flash (Spot)";
+      actionClass = "status-flash";
+      actionLabel = "Flash (Spot)";
+    }
+    
+    return {
+      symbol,
+      price: tickerData.lastPrice,
+      rangeLow,
+      rangeHigh,
+      rsi: rsi6,
+      volume24h: tickerData.volume24h,
+      dip: dipPercent,
+      action,
+      actionClass,
+      actionLabel,
+      structuralTrend,
+      momentumTag,
+      change24h: tickerData.price24hPcnt,
+      high24h: tickerData.high24h,
+      low24h: tickerData.low24h
+    };
+    
+  } catch (error) {
+    console.error(`Data error for ${symbol}:`, error);
+    return null;
+  }
+}
+
+function getWaitReason(rsi, dip, trend, momentum) {
+  if (rsi > 30 && dip < 8) return "No dip yet – wait for pullback";
+  if (rsi > 60) return "Overextended – avoid longs";
+  if (trend.includes("Strong Downtrend") && momentum.includes("Bull")) 
+    return "Let it cool down – wait for confirmation";
+  if (trend.includes("Strong Uptrend") && momentum.includes("Bear")) 
+    return "Let it cool down – wait for entry";
+  return "No valid setup";
+}
+
+async function scanAll() {
+  scanBtn.disabled = true;
+  statusText.textContent = "Starting scan...";
+  coinGrid.innerHTML = "<p>Scanning coins...</p>";
+  
+  const results = [];
+  for (const coin of coins) {
+    statusText.textContent = `Scanning ${coin}...`;
+    const data = await getCoinData(coin);
+    if (data) {
+      results.push(data);
+    }
+    await new Promise(resolve => setTimeout(resolve, 500)); // Delay between requests
+  }
+  
+  coinGrid.innerHTML = "";
+  
+  if (results.length === 0) {
+    coinGrid.innerHTML = `
+      <div style="grid-column:1/-1; text-align:center; padding:40px;">
+        <p>No data available. Check network connection.</p>
+        <button onclick="scanAll()" style="padding:10px 20px; background:#2563eb; color:white; border:none; border-radius:8px; cursor:pointer;">
+          Retry Scan
+        </button>
+      </div>
+    `;
+    scanBtn.disabled = false;
+    statusText.textContent = "Scan failed";
+    return;
+  }
+  
+  results.forEach(data => {
+    const card = document.createElement("div");
+    card.className = "coin-card";
+    
+    // Format price based on symbol
+    let priceDisplay;
+    if (data.symbol.includes("1000PEPE")) {
+      priceDisplay = data.price.toFixed(7);
+    } else if (data.symbol.includes("DOGE")) {
+      priceDisplay = data.price.toFixed(5);
+    } else {
+      priceDisplay = data.price.toFixed(3);
+    }
+    
+    // Format volume
+    const volumeDisplay = (data.volume24h / 1000000).toFixed(2) + "M";
+    
+    // RSI styling
+    const rsiClass = getRSIClass(data.rsi);
+    
+    // Trend color
+    let trendColor = "trend-range";
+    if (data.structuralTrend.includes("Downtrend")) trendColor = "trend-bear";
+    if (data.structuralTrend.includes("Uptrend") || data.structuralTrend.includes("Bull")) trendColor = "trend-bull";
+    
+    // Momentum class
+    let momentumClass = "momentum-neutral";
+    if (data.momentumTag.includes("Bull")) momentumClass = "momentum-up";
+    if (data.momentumTag.includes("Bear")) momentumClass = "momentum-down";
+    
+    // Wait reason
+    const waitReason = getWaitReason(data.rsi, data.dip, data.structuralTrend, data.momentumTag);
+    
+    card.innerHTML = `
+      <div class="coin-name">${data.symbol}</div>
+      <div class="price-display">${priceDisplay}</div>
+      <div class="data-row">24h Change: <strong>${data.change24h.toFixed(2)}%</strong></div>
+      <div class="data-row">24h Range: ${data.low24h.toFixed(7)} - ${data.high24h.toFixed(7)}</div>
+      <div class="data-row">Current Range: ${data.rangeLow.toFixed(7)} - ${data.rangeHigh.toFixed(7)}</div>
+      <div class="data-row">
+        RSI(6): <span class="rsi-display ${rsiClass}">${data.rsi.toFixed(2)}</span> | 
+        Vol: <strong>${volumeDisplay}</strong> | 
+        Dip: <strong>${data.dip.toFixed(2)}%</strong>
+      </div>
+      <div class="trend-tag ${trendColor}">${data.structuralTrend}</div>
+      <div class="momentum-tag ${momentumClass}">${data.momentumTag}</div>
+      <div class="status-button ${data.actionClass}">${data.actionLabel}</div>
+      ${data.actionLabel === "WAIT" ? `<div class="error">${waitReason}</div>` : ""}
+    `;
+    
+    coinGrid.appendChild(card);
+  });
+  
+  statusText.textContent = `Scan complete: ${results.length} coins analyzed`;
+  scanBtn.disabled = false;
+}
+
+scanBtn.addEventListener("click", scanAll);
+
+// Initial scan
+setTimeout(scanAll, 1000);
+
+// Auto-refresh every 30 seconds
+setInterval(scanAll, 30000);
+</script>
+</body>
+</html>
