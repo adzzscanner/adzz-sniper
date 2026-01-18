@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Trading System</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f0f;
+      color: #f0f0f0;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    h1, h2, h3 {
+      color: #4ade80;
+      margin-top: 1.5em;
+    }
+    h1 {
+      font-size: 28px;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-size: 22px;
+      border-left: 4px solid #4ade80;
+      padding-left: 12px;
+    }
+    h3 {
+      font-size: 20px;
+      color: #60a5fa;
+    }
+    .coin-list {
+      background: #1a1a1a;
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 18px;
+      margin: 12px 0;
+    }
+    .rule {
+      background: #1e1b4b;
+      padding: 14px;
+      border-radius: 8px;
+      margin: 12px 0;
+      font-size: 18px;
+    }
+    .alert-example {
+      background: #1a1a1a;
+      padding: 12px;
+      border-radius: 8px;      font-family: monospace;
+      font-size: 17px;
+      margin: 10px 0;
+      color: #fbbf24;
+    }
+    .total {
+      font-size: 20px;
+      font-weight: bold;
+      color: #f8fafc;
+      background: #7c2d12;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+      margin: 20px 0;
+    }
+    ul {
+      padding-left: 20px;
+      font-size: 18px;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🔥 My Trading System (v3.5)</h1>
+
+  <div class="total">
+    ✅ 39 Coins | Grid x3 | Flash x5 | Console Alerts Only
+  </div>
+
+  <h2>🎯 Core Rules</h2>
+
+  <h3>🟢 FLASH TRADES</h3>
+  <div class="rule">
+    • RSI(6) < 22 + Vol ≥2× → <strong>x5 | TP: 20%</strong><br>
+    • RSI(6) 22–27 + Vol ≥1.5× → <strong>x3 | TP: 15%</strong><br>
+    • MACD histogram must be improving (less red or green)
+  </div>
+
+  <h3>🟠 GRID TRADES</h3>
+  <div class="rule">
+    • Range width: <strong>18–25%</strong><br>
+    • Validated over <strong>4 days</strong> (both sides touched)<br>
+    • EMA28 flat, RSI(6) 35–50<br>
+    • Leverage: <strong>x3 ONLY</strong><br>
+    • Max duration: <strong>7 days</strong> → auto-exit
+  </div>
+  <h3>🔴 CHAOS FLASH</h3>
+  <div class="rule">
+    • RSI(6) < 20 + Vol ≥2× + Price ≤ -35% from high<br>
+    • Leverage: <strong>x3</strong> | TP: <strong>20%</strong><br>
+    • Only if no grid is active
+  </div>
+
+  <h3>🛑 Kill-Switches (Exit Immediately)</h3>
+  <ul>
+    <li>Candle closes outside grid range</li>
+    <li>RSI(6) < 30 (in grid)</li>
+    <li>EMA28 turns decisively down</li>
+    <li>BTC systemic drop</li>
+    <li>Day 7 reached</li>
+  </ul>
+
+  <h2>🪙 Coin Universe (39 Coins)</h2>
+
+  <h3>🔥 FLASH_COINS (24)</h3>
+  <div class="coin-list">
+    LITUSDT, WIFUSDT, PEPEUSDT, FOGOUSDT, PUMPFUNUSDT, LINEAUSDT, CAKEUSDT, POLUSDT,<br>
+    SUIUSDT, ZENUSDT, SAROSUSDT, GAIBUSDT, APEXUSDT, LINKUSDT, DOGEUSDT, BONKUSDT,<br>
+    SOLUSDT, INJUSDT, NEONUSDT, MNTUSDT, ONDOUSDT, ALCHUSDT, L3USDT, SWEATUSDT
+  </div>
+
+  <h3>🟠 GRID_COINS (15)</h3>
+  <div class="coin-list">
+    SUIUSDT, LINKUSDT, ZENUSDT, APEXUSDT, SAROSUSDT, GAIBUSDT, MNTUSDT, ONDOUSDT,<br>
+    NEONUSDT, POLUSDT, AAVEUSDT, INJUSDT, SOLUSDT, LITUSDT, NEARUSDT
+  </div>
+
+  <h2>🖨️ Console Alert Examples</h2>
+
+  <div class="alert-example">
+    🟢 FLASH: LITUSDT | RSI: 21 | Vol: 2.3× | Hist: green | x5 | TP: +20% → 2.16
+  </div>
+
+  <div class="alert-example">
+    🟡 FLASH: SUIUSDT | RSI: 25 | Vol: 1.7× | Hist: less red | x3 | TP: +15% → 0.94
+  </div>
+
+  <div class="alert-example">
+    🟠 GRID: SUIUSDT | Range: 0.80–0.95 (18.75%) | Validated: 4 days | x3
+  </div>
+
+  <div class="alert-example">
+    🔴 CHAOS: PEPEUSDT | RSI: 12 | Vol: 2.8× | -38% from high | x3 | TP: +20%
+  </div>
+
+  <h2>🧠 Philosophy</h2>  <div class="rule">
+    “Grid makes money while nothing happens.<br>
+    Chaos makes money when everything breaks.<br>
+    Survival comes from never confusing the two.”
+  </div>
+
+</body>
+</html>
