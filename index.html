@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Bybit Live Scanner v3.5 (MT Validated)</title>
+<style>
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+  background: #0f0f0f; 
+  color: #f0f0f0; 
+  padding: 20px; 
+  line-height: 1.6; 
+  margin: 0; 
+}
+h1, h2, h3 { color: #4ade80; margin-top: 1.5em; }
+h1 { text-align: center; font-size: 28px; margin-bottom: 20px; margin-top: 10px; }
+h2 { font-size: 22px; border-left: 4px solid #4ade80; padding-left: 12px; }
+h3 { font-size: 20px; color: #60a5fa; }
+.coin-list, .rule, .alert-example, .debug-info { 
+  border-radius: 10px; 
+  padding: 12px; 
+  margin: 12px 0; 
+}
+.coin-list { background: #1a1a1a; font-size: 18px; word-break: break-word; }
+.rule { background: #1e1b4b; font-size: 18px; }
+.alert-example { 
+  background: #1a1a1a; 
+  font-family: 'Courier New', monospace; 
+  font-size: 16px; 
+  color: #fbbf24; 
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+.debug-info {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  font-size: 14px;
+  color: #94a3b8;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.total { 
+  font-size: 20px; 
+  font-weight: bold; 
+  color: #f8fafc; 
+  background: #7c2d12; 
+  padding: 12px; 
+  text-align: center; 
+  margin: 20px 0;   border-radius: 8px; 
+}
+button { 
+  padding: 12px 20px; 
+  font-size: 18px; 
+  border-radius: 8px; 
+  border: none; 
+  background: #4ade80; 
+  color: #0f0f0f; 
+  cursor: pointer; 
+  margin-top: 8px;
+  font-weight: bold;
+  transition: all 0.3s;
+}
+button:hover {
+  background: #22c55e;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74, 222, 128, 0.3);
+}
+button:disabled {
+  background: #64748b;
+  cursor: not-allowed;
+  transform: none;
+}
+.footer { text-align: center; margin-top: 30px; color: #64748b; font-size: 16px; }
+#status { color: #60a5fa; margin: 10px 0; font-weight: bold; }
+.signal { margin: 8px 0; padding: 8px; border-radius: 6px; }
+.signal.flash { background: rgba(74, 222, 128, 0.15); border-left: 4px solid #4ade80; }
+.signal.grid { background: rgba(251, 191, 36, 0.15); border-left: 4px solid #fbbf24; }
+.signal.chaos { background: rgba(239, 68, 68, 0.15); border-left: 4px solid #ef4444; }
+.coin-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 14px;
+}
+.coin-table th {
+  background: #1e293b;
+  padding: 10px;
+  text-align: left;
+  border-bottom: 2px solid #334155;
+}
+.coin-table td {
+  padding: 10px;
+  border-bottom: 1px solid #334155;
+}
+.coin-table tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.controls {  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.control-group {
+  background: #1a1a1a;
+  padding: 15px;
+  border-radius: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+.control-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #94a3b8;
+}
+.control-group select,
+.control-group input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: white;
+}
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: #334155;
+  border-radius: 2px;
+  margin: 10px 0;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: #4ade80;
+  width: 0%;
+  transition: width 0.3s;
+}
+</style>
+</head>
+<body>
+
+<h1>🔥 Bybit Live Scanner v3.5 (MT Validated)</h1>
+<div class="total">✅ 39 Coins | Flash x5 | Grid x3 | Full 4-Day Validation</div>
+
+<div class="controls">
+  <div class="control-group">
+    <label for="scanMode">Scan Mode:</label>    <select id="scanMode">
+      <option value="full">Full Scan (All Signals)</option>
+      <option value="flash">Flash Signals Only</option>
+      <option value="grid">Grid Signals Only</option>
+      <option value="chaos">Chaos Signals Only</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label for="rsiPeriod">RSI Period:</label>
+    <select id="rsiPeriod">
+      <option value="6">6 (Default)</option>
+      <option value="7">7</option>
+      <option value="14">14</option>
+    </select>
+  </div>
+  <div class="control-group">
+    <label for="minVolumeRatio">Min Volume Ratio:</label>
+    <input type="number" id="minVolumeRatio" value="1.5" step="0.1" min="1.0" max="10.0">
+  </div>
+</div>
+
+<button onclick="scanLive()" id="scanBtn">🌐 Scan Live Coin Universe</button>
+<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+<div id="status">Ready to scan. Click button to start.</div>
+
+<div id="result" class="alert-example"></div>
+
+<div class="debug-info" id="debugInfo"></div>
+
+<!-- Coin Data Table (like screenshot) -->
+<h3>📊 Live Coin Data</h3>
+<div id="coinTableContainer"></div>
+
+<script>
+// Configuration
+const CONFIG = {
+  gridRangeMin: 15,    // MT: 15-30% range (was 18-25%)
+  gridRangeMax: 30,
+  gridMinTouches: 3,   // MT: Require at least 3 touches
+  flashRsiLow: 22,     // For 5x signals
+  flashRsiMed: 27,     // For 3x signals
+  chaosDropMin: 35,    // Minimum drop % for chaos
+  emaSlopeMax: 0.005   // Max EMA28 slope for grid
+};
+
+// ✅ FULL 39-COIN UNIVERSE
+const COIN_UNIVERSE = [
+  // Flash Coins (24)
+  "LITUSDT", "WIFUSDT", "PEPEUSDT", "FOGOUSDT", "PUMPFUNUSDT", "LINEAUSDT", 
+  "CAKEUSDT", "POLUSDT", "SUIUSDT", "ZENUSDT", "SAROSUSDT", "GAIBUSDT",   "APEXUSDT", "LINKUSDT", "DOGEUSDT", "BONKUSDT", "SOLUSDT", "INJUSDT", 
+  "NEONUSDT", "MNTUSDT", "ONDOUSDT", "ALCHUSDT", "L3USDT", "SWEATUSDT",
+
+  // Grid Coins (15)
+  "AAVEUSDT", "NEARUSDT", "TRUMPUSDT", "FARTCOINUSDT", "BREVUSDT", 
+  "STBLUSDT", "CUDISUSDT", "KMNOUSDT", "YGGUSDT", "AVAAIUSDT", 
+  "YBUSDT", "ZAMAUSDT", "VIRTUALUSDT", "ILVUSDT", "QNTUSDT"
+];
+
+// ... [rest of your JavaScript code remains exactly the same] ...
+
+// Debug logging
+let debugLog = [];
+
+function logDebug(message) {
+  const timestamp = new Date().toLocaleTimeString();
+  debugLog.push(`[${timestamp}] ${message}`);
+  
+  const debugDiv = document.getElementById('debugInfo');
+  if (debugDiv) {
+    debugDiv.innerHTML = debugLog.slice(-20).join('<br>');
+    debugDiv.scrollTop = debugDiv.scrollHeight;
+  }
+}
+
+// Enhanced RSI calculation (MT validated)
+function calculateRSI_MT(prices, period = 6) {
+  if (prices.length < period + 1) {
+    logDebug(`Insufficient data for RSI: ${prices.length} < ${period + 1}`);
+    return 50;
+  }
+  
+  let gains = 0;
+  let losses = 0;
+  
+  for (let i = 1; i <= period; i++) {
+    const diff = prices[prices.length - i] - prices[prices.length - i - 1];
+    if (diff > 0) {
+      gains += diff;
+    } else {
+      losses -= diff;
+    }
+  }
+  
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  
+  if (avgLoss === 0) {
+    logDebug("RSI: No losses in period, returning 100");
+    return 100;  }
+  
+  const rs = avgGain / avgLoss;
+  const rsi = 100 - (100 / (1 + rs));
+  
+  logDebug(`RSI(${period}): gains=${avgGain.toFixed(6)}, losses=${avgLoss.toFixed(6)}, RS=${rs.toFixed(4)}, RSI=${rsi.toFixed(2)}`);
+  return rsi;
+}
+
+// Fixed EMA calculation
+function calculateEMA_Proper(prices, period) {
+  if (prices.length < period) {
+    logDebug(`EMA${period}: Insufficient data (${prices.length} < ${period})`);
+    return prices.length > 0 ? prices[prices.length - 1] : null;
+  }
+  
+  // Calculate SMA for first value
+  let sum = 0;
+  for (let i = 0; i < period; i++) {
+    sum += prices[i];
+  }
+  let ema = sum / period;
+  
+  const k = 2 / (period + 1);
+  
+  // Calculate EMA for remaining values
+  for (let i = period; i < prices.length; i++) {
+    ema = (prices[i] * k) + (ema * (1 - k));
+  }
+  
+  logDebug(`EMA${period}: ${ema.toFixed(6)} (from ${prices.length} prices)`);
+  return ema;
+}
+
+// Enhanced volume ratio (MT style)
+function calculateVolumeRatio_MT(volumes, lookback = 20) {
+  if (volumes.length < lookback + 1) {
+    logDebug(`Volume: Insufficient data (${volumes.length} < ${lookback + 1})`);
+    return 1;
+  }
+  
+  const currentVol = volumes[volumes.length - 1];
+  const prevVolumes = volumes.slice(-lookback - 1, -1);
+  const avgVol = prevVolumes.reduce((a, b) => a + b, 0) / lookback;
+  
+  const ratio = currentVol / avgVol;
+  logDebug(`Volume Ratio: current=${currentVol.toFixed(2)}, avg=${avgVol.toFixed(2)}, ratio=${ratio.toFixed(2)}`);
+  return ratio;
+}
+// MT Grid validation
+function validateGrid_MT(klines) {
+  if (klines.length < 96 * 4) { // Need at least 4 days
+    logDebug("Grid: Insufficient data for 4-day validation");
+    return null;
+  }
+  
+  const recent4days = klines.slice(-96 * 4); // 4 days * 96 candles/day (15m)
+  const highs = recent4days.map(k => k.high);
+  const lows = recent4days.map(k => k.low);
+  
+  const support = Math.min(...lows);
+  const resistance = Math.max(...highs);
+  const rangePct = ((resistance - support) / support) * 100;
+  
+  logDebug(`Grid Range: Support=${support.toFixed(4)}, Resistance=${resistance.toFixed(4)}, Range=${rangePct.toFixed(2)}%`);
+  
+  // MT Condition 1: Range between config values
+  if (rangePct < CONFIG.gridRangeMin || rangePct > CONFIG.gridRangeMax) {
+    logDebug(`Grid: Range ${rangePct.toFixed(2)}% outside limits ${CONFIG.gridRangeMin}-${CONFIG.gridRangeMax}%`);
+    return null;
+  }
+  
+  // MT Condition 2: Count touches
+  let supportTouches = 0;
+  let resistanceTouches = 0;
+  const touchThreshold = 0.005; // 0.5% threshold
+  
+  recent4days.forEach((k, index) => {
+    // Check if low touches support (within 0.5%)
+    if (k.low <= support * (1 + touchThreshold)) {
+      supportTouches++;
+      logDebug(`Grid Support Touch #${supportTouches} at candle ${index}: ${k.low.toFixed(4)}`);
+    }
+    
+    // Check if high touches resistance (within 0.5%)
+    if (k.high >= resistance * (1 - touchThreshold)) {
+      resistanceTouches++;
+      logDebug(`Grid Resistance Touch #${resistanceTouches} at candle ${index}: ${k.high.toFixed(4)}`);
+    }
+  });
+  
+  // MT Condition 3: Minimum touches required
+  if (supportTouches < CONFIG.gridMinTouches || resistanceTouches < CONFIG.gridMinTouches) {
+    logDebug(`Grid: Insufficient touches (Support: ${supportTouches}, Resistance: ${resistanceTouches})`);
+    return null;
+  }
+  
+  // MT Condition 4: Price should be in middle of range
+  const currentPrice = klines[klines.length - 1].close;  const rangePosition = (currentPrice - support) / (resistance - support);
+  
+  if (rangePosition < 0.2 || rangePosition > 0.8) {
+    logDebug(`Grid: Price at ${rangePosition.toFixed(2)}% of range (too extreme)`);
+    return null;
+  }
+  
+  // MT Condition 5: EMA28 slope check
+  const closes = klines.map(k => k.close);
+  const ema28 = calculateEMA_Proper(closes, 28);
+  const ema28Prev = calculateEMA_Proper(closes.slice(0, -1), 28);
+  const emaSlope = Math.abs(ema28 - ema28Prev) / ema28Prev;
+  
+  if (emaSlope > CONFIG.emaSlopeMax) {
+    logDebug(`Grid: EMA slope ${emaSlope.toFixed(6)} > ${CONFIG.emaSlopeMax}`);
+    return null;
+  }
+  
+  logDebug(`✅ Grid VALID: ${supportTouches}s/${resistanceTouches}r touches, ${rangePct.toFixed(2)}% range, slope=${emaSlope.toFixed(6)}`);
+  
+  return {
+    support: support,
+    resistance: resistance,
+    rangePct: rangePct,
+    touches: { support: supportTouches, resistance: resistanceTouches },
+    currentPosition: (rangePosition * 100).toFixed(1)
+  };
+}
+
+// Simplified MACD calculation
+function calculateMACD(closes) {
+  if (closes.length < 26) return { histogram: 0, improving: false };
+  
+  const ema12 = calculateEMA_Proper(closes.slice(-26), 12);
+  const ema26 = calculateEMA_Proper(closes.slice(-26), 26);
+  const macdLine = ema12 - ema26;
+  
+  // Calculate previous MACD for trend
+  const prevEma12 = calculateEMA_Proper(closes.slice(-27, -1), 12);
+  const prevEma26 = calculateEMA_Proper(closes.slice(-27, -1), 26);
+  const prevMacdLine = prevEma12 - prevEma26;
+  
+  const histogram = macdLine - prevMacdLine;
+  const improving = histogram > 0;
+  
+  logDebug(`MACD: ${macdLine.toFixed(6)} (prev ${prevMacdLine.toFixed(6)}), hist=${histogram.toFixed(6)}, improving=${improving}`);
+  
+  return { histogram: histogram, improving: improving };
+}
+// Main scan function
+async function scanLive() {
+  const scanBtn = document.getElementById('scanBtn');
+  const status = document.getElementById('status');
+  const resultDiv = document.getElementById('result');
+  const progressFill = document.getElementById('progressFill');
+  const coinTableContainer = document.getElementById('coinTableContainer');
+  
+  // Get user settings
+  const scanMode = document.getElementById('scanMode').value;
+  const rsiPeriod = parseInt(document.getElementById('rsiPeriod').value);
+  const minVolumeRatio = parseFloat(document.getElementById('minVolumeRatio').value);
+  
+  // Reset UI
+  scanBtn.disabled = true;
+  scanBtn.textContent = '⏳ Scanning...';
+  status.innerHTML = 'Starting scan...';
+  resultDiv.innerHTML = '';
+  debugLog = [];
+  logDebug('=== Starting new scan ===');
+  
+  const validSignals = [];
+  const coinData = []; // For table display
+  
+  const totalCoins = COIN_UNIVERSE.length;
+  let scanned = 0;
+  
+  for (const symbol of COIN_UNIVERSE) {
+    try {
+      logDebug(`\n=== Scanning ${symbol} ===`);
+      status.innerHTML = `Scanning ${symbol} (${scanned + 1}/${totalCoins})...`;
+      progressFill.style.width = `${((scanned + 1) / totalCoins) * 100}%`;
+      
+      // Fetch data from Bybit
+      const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=15&limit=500`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      
+      if (data.retCode !== 0 || !data.result?.list) {
+        logDebug(`API error for ${symbol}: ${data.retMsg || 'No data'}`);
+        continue;
+      }
+      
+      // Parse klines
+      const klines = data.result.list.map(c => ({
+        time: parseInt(c[0]),
+        open: parseFloat(c[1]),
+        high: parseFloat(c[2]),
+        low: parseFloat(c[3]),
+        close: parseFloat(c[4]),        volume: parseFloat(c[5])
+      })).reverse();
+      
+      if (klines.length < 100) {
+        logDebug(`Insufficient klines: ${klines.length}`);
+        continue;
+      }
+      
+      const closes = klines.map(k => k.close);
+      const volumes = klines.map(k => k.volume);
+      const price = closes[closes.length - 1];
+      
+      // Calculate indicators
+      const rsi = calculateRSI_MT(closes, rsiPeriod);
+      const ema7 = calculateEMA_Proper(closes, 7);
+      const ema28 = calculateEMA_Proper(closes, 28);
+      const volRatio = calculateVolumeRatio_MT(volumes);
+      const macd = calculateMACD(closes);
+      
+      // Store for table
+      coinData.push({
+        symbol: symbol,
+        price: price,
+        rsi: rsi,
+        ema7: ema7,
+        ema28: ema28,
+        macd: macd.histogram,
+        volRatio: volRatio,
+        grid: null
+      });
+      
+      // FLASH Signals
+      if (scanMode === 'full' || scanMode === 'flash') {
+        // Strong Flash (5x) - RSI < 22
+        if (rsi < CONFIG.flashRsiLow && volRatio >= Math.max(minVolumeRatio, 2.0) && 
+            macd.improving && price >= ema7 * 0.98) {
+          const tp = (price * 1.20).toFixed(4);
+          validSignals.push({
+            type: 'flash',
+            symbol: symbol,
+            message: `🟢 FLASH 5x: ${symbol} | RSI: ${rsi.toFixed(1)} | Vol: ${volRatio.toFixed(1)}× | TP: +20% → ${tp}`,
+            details: { rsi, volRatio, price, tp }
+          });
+          logDebug(`✅ FLASH 5x signal found for ${symbol}`);
+        }
+        // Medium Flash (3x) - RSI 22-27
+        else if (rsi >= CONFIG.flashRsiLow && rsi < CONFIG.flashRsiMed && 
+                 volRatio >= Math.max(minVolumeRatio, 1.5) && 
+                 macd.improving && price >= ema7 * 0.98) {
+          const tp = (price * 1.15).toFixed(4);          validSignals.push({
+            type: 'flash',
+            symbol: symbol,
+            message: `🟡 FLASH 3x: ${symbol} | RSI: ${rsi.toFixed(1)} | Vol: ${volRatio.toFixed(1)}× | TP: +15% → ${tp}`,
+            details: { rsi, volRatio, price, tp }
+          });
+          logDebug(`✅ FLASH 3x signal found for ${symbol}`);
+        }
+      }
+      
+      // CHAOS Signals
+      if (scanMode === 'full' || scanMode === 'chaos') {
+        const recentHigh = Math.max(...klines.slice(-20).map(k => k.high));
+        const dropPct = ((recentHigh - price) / recentHigh) * 100;
+        
+        if (rsi < 20 && volRatio >= Math.max(minVolumeRatio, 2.0) && 
+            dropPct >= CONFIG.chaosDropMin && macd.improving) {
+          const tp = (price * 1.20).toFixed(4);
+          validSignals.push({
+            type: 'chaos',
+            symbol: symbol,
+            message: `🔴 CHAOS 3x: ${symbol} | RSI: ${rsi.toFixed(1)} | Vol: ${volRatio.toFixed(1)}× | Drop: -${dropPct.toFixed(0)}% | TP: +20% → ${tp}`,
+            details: { rsi, volRatio, dropPct, price, tp }
+          });
+          logDebug(`✅ CHAOS signal found for ${symbol}`);
+        }
+      }
+      
+      // GRID Signals
+      if (scanMode === 'full' || scanMode === 'grid') {
+        const grid = validateGrid_MT(klines);
+        if (grid && rsi >= 35 && rsi <= 50) {
+          // Update coin data with grid info
+          const coin = coinData.find(c => c.symbol === symbol);
+          if (coin) coin.grid = grid;
+          
+          validSignals.push({
+            type: 'grid',
+            symbol: symbol,
+            message: `🟠 GRID 3x: ${symbol} | Range: ${grid.support.toFixed(4)}–${grid.resistance.toFixed(4)} (${grid.rangePct.toFixed(2)}%) | Pos: ${grid.currentPosition}% | Validated 4 days`,
+            details: grid
+          });
+          logDebug(`✅ GRID signal found for ${symbol}`);
+        }
+      }
+      
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+    } catch (error) {      logDebug(`❌ Error scanning ${symbol}: ${error.message}`);
+    }
+    
+    scanned++;
+  }
+  
+  // Update progress bar
+  progressFill.style.width = '100%';
+  
+  // Display results
+  if (validSignals.length > 0) {
+    let html = '';
+    validSignals.forEach(signal => {
+      html += `<div class="signal ${signal.type}">${signal.message}</div>\n`;
+    });
+    resultDiv.innerHTML = html;
+    status.innerHTML = `✅ Scan complete. Found ${validSignals.length} valid signals.`;
+  } else {
+    resultDiv.innerHTML = '⏳ No valid setups found.\nWait for clear signals.';
+    status.innerHTML = 'Scan complete. No signals found.';
+  }
+  
+  // Generate coin table (like in screenshot)
+  generateCoinTable(coinData);
+  
+  // Reset button
+  scanBtn.disabled = false;
+  scanBtn.textContent = '🌐 Scan Live Coin Universe';
+  
+  logDebug('=== Scan complete ===');
+}
+
+// Generate coin table like screenshot
+function generateCoinTable(coinData) {
+  const container = document.getElementById('coinTableContainer');
+  
+  if (!coinData || coinData.length === 0) {
+    container.innerHTML = '<p>No coin data available.</p>';
+    return;
+  }
+  
+  let html = `
+    <div style="overflow-x: auto;">
+      <table class="coin-table">
+        <thead>
+          <tr>
+            <th>Coin</th>
+            <th>Price</th>
+            <th>RSI(6)</th>
+            <th>EMA7</th>            <th>EMA28</th>
+            <th>MACD Hist</th>
+            <th>Vol Ratio</th>
+            <th>Grid Support</th>
+            <th>Grid Resistance</th>
+            <th>Grid Range%</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+  
+  coinData.forEach(coin => {
+    const gridSupport = coin.grid ? coin.grid.support.toFixed(4) : '-';
+    const gridResistance = coin.grid ? coin.grid.resistance.toFixed(4) : '-';
+    const gridRange = coin.grid ? coin.grid.rangePct.toFixed(2) : '-';
+    
+    // Color coding for RSI
+    let rsiColor = '#f0f0f0';
+    if (coin.rsi < 30) rsiColor = '#ef4444'; // Oversold (red)
+    if (coin.rsi > 70) rsiColor = '#10b981'; // Overbought (green)
+    
+    html += `
+      <tr>
+        <td><strong>${coin.symbol}</strong></td>
+        <td>${coin.price.toFixed(4)}</td>
+        <td style="color: ${rsiColor}">${coin.rsi.toFixed(2)}</td>
+        <td>${coin.ema7 ? coin.ema7.toFixed(4) : '-'}</td>
+        <td>${coin.ema28 ? coin.ema28.toFixed(4) : '-'}</td>
+        <td>${coin.macd.toFixed(5)}</td>
+        <td>${coin.volRatio.toFixed(2)}</td>
+        <td>${gridSupport}</td>
+        <td>${gridResistance}</td>
+        <td>${gridRange}</td>
+      </tr>
+    `;
+  });
+  
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  container.innerHTML = html;
+}
+
+// Auto-refresh every 5 minutes
+setInterval(() => {
+  const status = document.getElementById('status');
+  if (status && !status.innerHTML.includes('Scanning')) {    logDebug('Auto-refresh triggered');
+    // Uncomment to enable auto-refresh:
+    // scanLive();
+  }
+}, 300000); // 5 minutes
+
+// Initial instructions
+logDebug('Ready to scan. Click the scan button to start.');
+logDebug(`Configuration: Grid ${CONFIG.gridRangeMin}-${CONFIG.gridRangeMax}%, Min touches: ${CONFIG.gridMinTouches}`);
+
+</script>
+
+<div class="footer">
+  <p>Bybit-native • MT-Validated Grid Logic • 15m candles • GitHub-Ready</p>
+  <p>v3.5.1 | Patched EMA & Grid Validation | Live Scanner</p>
+</div>
+
+</body>
+</html>
