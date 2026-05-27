@@ -1,539 +1,378 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Bybit Live Scanner v3.5.5 (Mobile Optimized)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V15 DUAL-TF UNIVERSAL SCANNER (EXECUTION MODE)</title>
 <style>
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #0f0f0f;
-  color: #f0f0f0;
-  padding: 12px;
-  line-height: 1.6;
-  margin: 0;
-  font-size: 14px;
-}
-h1, h2, h3 { color: #4ade80; margin-top:1.5em; }
-h1 { text-align:center; font-size:22px; margin-bottom:12px; margin-top:8px; }
-h2 { font-size:18px; border-left:4px solid #4ade80; padding-left:8px; }
-h3 { font-size:16px; color:#60a5fa; }
-.coin-list,.rule,.alert-example,.debug-info {
-  border-radius:8px;
-  padding:10px;
-  margin:8px 0;
-  font-size:14px;
-}
-.alert-example {
-  background:#1a1a1a;
-  font-family:'Courier New', monospace;
-  color:#fbbf24;
-  white-space:pre-wrap;
-  line-height:1.4;
-  border:1px solid #334155;
-}
-.debug-info {
-  background:#1a1a1a;
-  border:1px solid #333;
-  color:#94a3b8;
-  max-height:200px;
-  overflow-y:auto;
-  font-size:12px;
-  padding:8px;
-}
-.total {
-  font-size:16px;
-  font-weight:bold;
-  color:#f8fafc;
-  background:#7c2d12;
-  padding:8px;
-  text-align:center;  margin:12px 0;
-  border-radius:6px;
-}
-button {
-  padding:10px 16px;
-  font-size:16px;
-  border-radius:6px;
-  border:none;
-  background:#4ade80;
-  color:#0f0f0f;
-  cursor:pointer;
-  margin-top:6px;
-  font-weight:bold;
-  transition:all 0.3s;
-  width:100%;
-}
-button:hover {
-  background:#22c55e;
-  transform:translateY(-2px);
-  box-shadow:0 4px 12px rgba(74,222,128,0.3);
-}
-button:disabled {
-  background:#64748b;
-  cursor:not-allowed;
-  transform:none;
-}
-.footer {
-  text-align:center;
-  margin-top:20px;
-  color:#64748b;
-  font-size:12px;
-}
-#status {
-  color:#60a5fa;
-  margin:8px 0;
-  font-weight:bold;
-  font-size:14px;
-}
-.signal {
-  margin:6px 0;
-  padding:6px;
-  border-radius:4px;
-  font-size:14px;
-}
-.signal.flash { background:rgba(74,222,128,0.15); border-left:4px solid #4ade80; }
-.signal.grid { background:rgba(251,191,36,0.15); border-left:4px solid #fbbf24; }
-.signal.chaos { background:rgba(239,68,68,0.15); border-left:4px solid #ef4444; }
-
-/* Coin Table */
-.coin-table {  width:100%;
-  border-collapse:collapse;
-  margin:12px 0;
-  font-size:13px;
-}
-.coin-table th {
-  background:#1e293b;
-  padding:6px;
-  text-align:left;
-  border-bottom:1px solid #334155;
-  font-weight:600;
-}
-.coin-table td {
-  padding:6px;
-  border-bottom:1px solid #334155;
-  word-break:break-word;
-}
-.coin-table tr:hover {
-  background:rgba(255,255,255,0.05);
-}
-
-.controls {
-  display:flex;
-  gap:8px;
-  margin-bottom:12px;
-  flex-wrap:wrap;
-}
-.control-group {
-  background:#1a1a1a;
-  padding:10px;
-  border-radius:6px;
-  flex:1;
-  min-width:120px;
-}
-.control-group label {
-  display:block;
-  margin-bottom:4px;
-  color:#94a3b8;
-  font-size:13px;
-}
-.control-group select,
-.control-group input {
-  width:100%;
-  padding:6px;
-  border-radius:4px;
-  border:1px solid #334155;
-  background:#0f172a;
-  color:white;
-  font-size:13px;
-}
-.progress-bar {
-  width:100%;
-  height:3px;
-  background:#334155;
-  border-radius:2px;
-  margin:8px 0;
-  overflow:hidden;
-}
-.progress-fill {
-  height:100%;
-  background:#4ade80;
-  width:0%;
-  transition: width 0.3s;
-}
-
-/* Mobile responsive */
-@media (max-width: 600px) {
-  .controls { flex-direction: column; }
-  .coin-table th, .coin-table td { padding:4px; font-size:12px; }
-  h1 { font-size:20px; }
-}
+body{margin:0;background:#0b0f14;color:#fff;font-family:Arial;padding:12px;}
+h2{text-align:center;color:#00ff99;font-size:20px;margin-bottom:5px;}
+.sub{text-align:center;color:#7a8594;font-size:11px;margin-bottom:12px;}
+button{padding:10px;margin:5px;border:none;font-weight:bold;border-radius:8px;cursor:pointer;font-size:13px;}
+.core{background:#00ff99;color:#000;}
+.spot{background:#00c2ff;color:#000;}
+.fut{background:#ffcc00;color:#000;}
+.grid{background:#ff9900;color:#000;}
+.card{background:#141a22;margin:8px 0;padding:12px;border-radius:10px;border:1px solid #263241;font-size:12px;line-height:1.5;}
+.tf1h{color:#00c2ff;font-weight:bold;}
+.tf4h{color:#ffcc00;font-weight:bold;}
+.confluence{color:#00ff99;font-weight:bold;font-size:14px;}
+.error{color:#ff5555;}
+.box{background:#1a2330;padding:8px;border-radius:6px;margin:5px 0;}
+.progress{height:4px;background:#263241;border-radius:2px;margin:8px 0;overflow:hidden;}
+.progress-bar{height:100%;background:#00ff99;width:0%;transition:width 0.3s;}
+.trigger{color:#00ff99;margin-top:4px;font-size:11px;}
+.grid-ladder{color:#7a8594;font-size:11px;margin-top:4px;word-break:break-all;}
+.risk-info{color:#ffcc00;font-size:11px;margin-top:4px;border-top:1px solid #263241;padding-top:4px;}
 </style>
 </head>
 <body>
-
-<h1>🔥 Bybit Live Scanner v3.5.5 (Mobile Optimized)</h1>
-<div class="total">✅ 39 Coins | Flash x5 | Grid x3 | MT Validated</div>
-
-<div class="controls">
-  <div class="control-group">
-    <label for="scanMode">Scan Mode:</label>
-    <select id="scanMode">
-      <option value="full" data-vol="1.5">Full Scan</option>
-      <option value="flash" data-vol="2.0">Flash Only</option>
-      <option value="grid" data-vol="1.0">Grid Only</option>
-      <option value="chaos" data-vol="3.0">Chaos Only</option>
-    </select>
-  </div>
-  <div class="control-group">
-    <label for="rsiPeriod">RSI Period (Display):</label>
-    <select id="rsiPeriod">
-      <option value="6">6</option>
-      <option value="7">7</option>
-      <option value="14">14</option>
-    </select>
-  </div>
-  <div class="control-group">
-    <label for="minVolumeRatio">Min Vol Ratio:</label>
-    <input type="number" id="minVolumeRatio" value="1.5" step="0.1" min="1.0" max="10.0">  </div>
+<h2> V15 EXECUTION MODE</h2>
+<div class="sub">Only tradeable setups • Zero noise • Fast rotation</div>
+<div style="display:flex;justify-content:center;gap:5px;flex-wrap:wrap;">
+  <button class="core" onclick="scanCore()">CORE</button>
+  <button class="spot" onclick="scanSpot()">SPOT</button>
+  <button class="fut" onclick="scanFutures()">FUTURES</button>
+  <button class="grid" onclick="scanGrid()">GRID</button>
 </div>
-
-<button onclick="scanLive()" id="scanBtn">🌐 Scan Live Coin Universe</button>
-<div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
-<div id="status">Ready to scan. Click button to start.</div>
-
-<div id="result" class="alert-example"></div>
-<div class="debug-info" id="debugInfo"></div>
-
-<h3>📊 Live Coin Data</h3>
-<div id="coinTableContainer"></div>
-
+<div id="status" style="text-align:center;color:#7a8594;margin:8px 0;font-size:12px;">Ready</div>
+<div class="progress"><div class="progress-bar" id="pbar"></div></div>
+<div id="out"></div>
 <script>
-// --- CONFIG ---
-const CONFIG = { 
-  gridRangeMin:15, 
-  gridRangeMax:30, 
-  gridMinTouches:3, 
-  flashRsiLow:22, 
-  flashRsiMed:27, 
-  chaosDropMin:35, 
-  emaSlopeMax:0.005 
-};
-const COIN_UNIVERSE = [
-  "LITUSDT","WIFUSDT","PEPEUSDT","FOGOUSDT","PUMPFUNUSDT","LINEAUSDT","CAKEUSDT","POLUSDT",
-  "SUIUSDT","ZENUSDT","SAROSUSDT","GAIBUSDT","APEXUSDT","LINKUSDT","DOGEUSDT","BONKUSDT",
-  "SOLUSDT","INJUSDT","NEONUSDT","MNTUSDT","ONDOUSDT","ALCHUSDT","L3USDT","SWEATUSDT",
-  "AAVEUSDT","NEARUSDT","TRUMPUSDT","FARTCOINUSDT","BREVUSDT","STBLUSDT","CUDISUSDT",
-  "KMNOUSDT","YGGUSDT","AVAAIUSDT","YBUSDT","ZAMAUSDT","VIRTUALUSDT","ILVUSDT","QNTUSDT"
+// ================= CONFIG =================
+const MAX_DISPLAY = 3;
+const CHUNK_SIZE = 3;
+const CHUNK_DELAY = 400;
+const MIN_CANDLES = 30;
+const MIN_DOLLAR_VOL = 500000;
+const REENTRY_BLOCK_CANDLES = 6;
+
+let scanAbort = false;let accountBalance = 500;
+let riskPerTrade = 0.02;
+let minRR = 1.0;
+let recentSetups = new Map();
+let currentR4 = 0, currentV4 = 0;
+
+// ✅ FINAL 22-COIN CORE LIST
+const core = [
+  // AI / INFRA
+  "RENDERUSDT", "FETUSDT", "TAOUSDT", "WLDUSDT",
+  // SOLANA
+  "JUPUSDT", "BONKUSDT", "WIFUSDT", "PYTHUSDT", "JTOUSDT",
+  // L1/L2
+  "SEIUSDT", "SUIUSDT", "INJUSDT", "TIAUSDT", "ARBUSDT", "OPUSDT",
+  // CHAOS
+  "XAIUSDT", "HYPEUSDT", "HYPERUSDT",
+  // DEFI
+  "DYDXUSDT", "ENAUSDT", "PENDLEUSDT", "ETHFIUSDT"
 ];
 
-let debugLog = [];
-function logDebug(msg) {
-  const ts = new Date().toLocaleTimeString();
-  debugLog.push(`[${ts}] ${msg}`);
-  const el = document.getElementById('debugInfo');
-  if (el) {
-    el.innerHTML = debugLog.slice(-20).join('<br>');
-    el.scrollTop = el.scrollHeight;
+const SLOW_COINS = new Set(["BTCUSDT","ETHUSDT","BNBUSDT","XRPUSDT","ADAUSDT","DOTUSDT","LTCUSDT","BCHUSDT"]);
+const COIN_BETA = {"NEARUSDT":11.87,"ONDOUSDT":7.46,"RENDERUSDT":2.89,"FETUSDT":3.10,"HYPEUSDT":4.97,"AVAXUSDT":2.12,"SUIUSDT":1.71,"DEFAULT":1.0};
+function getCoinBeta(sym){return COIN_BETA[sym]||COIN_BETA["DEFAULT"];}
+
+// ================= 🔧 ROBUST API =================
+async function fetchBybit(endpoint,params={}){
+  const q=new URLSearchParams(params).toString();
+  const baseUrl=`https://api.bybit.com${endpoint}${q?'?'+q:''}`;
+  const proxies=[(url)=>`https://corsproxy.io/?${encodeURIComponent(url)}`,(url)=>url];
+  for(const buildProxy of proxies){
+    try{
+      const proxyUrl=buildProxy(baseUrl);
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),12000);
+      const response=await fetch(proxyUrl,{signal:controller.signal,headers:{'Accept':'application/json'}});
+      clearTimeout(timeout);
+      if(!response.ok)continue;
+      const text=await response.text();
+      if(text.includes('<html')||text.includes('DOCTYPE')||text.length<20)continue;
+      let data;try{data=JSON.parse(text);}catch(e){continue;}
+      if(data&&(data.retCode===0||data.success===true||(data.result&&Array.isArray(data.result.list))))return data;
+    }catch(e){continue;}
   }
+  return null;
 }
 
-const scanModeSelect = document.getElementById('scanMode');
-const rsiPeriodSelect = document.getElementById('rsiPeriod');
-const minVolumeInput = document.getElementById('minVolumeRatio');
+async function safeGetKlines(sym,cat,intv){
+  const data=await fetchBybit('/v5/market/kline',{category:cat,symbol:sym,interval:intv,limit:'100'});
+  if(!data)return[];
+  const list=data.result?.list||data.data?.list||[];  if(!Array.isArray(list)||list.length===0)return[];
+  try{return list.map(k=>({t:parseInt(k[0]),o:parseFloat(k[1]),h:parseFloat(k[2]),l:parseFloat(k[3]),c:parseFloat(k[4]),v:parseFloat(k[5])})).reverse();}
+  catch(e){return[];}
+}
 
-scanModeSelect.addEventListener('change', () => {
-  const opt = scanModeSelect.selectedOptions[0];
-  minVolumeInput.value = opt.dataset.vol;});
+// ================= INDICATORS =================
+function calcRSI(c,p=14){
+  if(!c||c.length<p+2)return 50;
+  let g=0,l=0;
+  for(let i=1;i<=p;i++){let d=c[i]-c[i-1];d>=0?g+=d:l+=Math.abs(d);}
+  let ag=g/p,al=l/p;
+  for(let i=p;i<c.length;i++){let d=c[i]-c[i-1];if(d>=0){ag=(ag*(p-1)+d)/p;al=(al*(p-1))/p;}else{ag=(ag*(p-1))/p;al=(al*(p-1)+Math.abs(d))/p;}}
+  return 100-(100/(1+ag/(al||1)));
+}
+function calcATR(kl,p=14){
+  if(!kl||kl.length<p+1)return 0;
+  let tr=[];
+  for(let i=1;i<kl.length;i++)tr.push(Math.max(kl[i].h-kl[i].l,Math.abs(kl[i].h-kl[i-1].c),Math.abs(kl[i].l-kl[i-1].c)));
+  let a=tr.slice(0,p).reduce((x,y)=>x+y,0)/p;
+  for(let i=p;i<tr.length;i++)a=(a*(p-1)+tr[i])/p;
+  return a;
+}
+function volRatio(kl){
+  if(!kl||kl.length<20)return 1;
+  let v=kl.map(k=>k.v),avg=v.slice(-20).reduce((x,y)=>x+y,0)/20;
+  return avg===0?1:v.at(-1)/avg;
+}
+function ema(arr,p){
+  if(!arr||arr.length===0)return 0;
+  if(arr.length<p)return arr[arr.length-1]||0;
+  const k=2/(p+1);let e=arr.slice(0,p).reduce((a,b)=>a+b,0)/p;
+  for(let i=p;i<arr.length;i++)e=arr[i]*k+e*(1-k);
+  return e;
+}
 
-// --- Core Indicators ---
-function calculateRSI(prices, period) {
-  if (prices.length < period + 1) return 50;
-  let gains = 0, losses = 0;
-  for (let i = 1; i <= period; i++) {
-    const diff = prices[prices.length - i] - prices[prices.length - i - 1];
-    if (diff > 0) gains += diff;
-    else losses -= diff;
+// ================= STRATEGY =================
+function getStrat(ap,r,v,c,tf){
+  if(!c||c.length<30)return'NEUTRAL';
+  let e9=ema(c.slice(-30),9),e21=ema(c.slice(-30),21);
+  let last=c.at(-1),p5=c[c.length-5],p10=c[c.length-10];
+  let m5=((last-p5)/p5)*100,m10=((last-p10)/p10)*100;
+  let diff=((e9-e21)/e21)*100;
+  let prevE9=ema(c.slice(-35,-5),9),prevE21=ema(c.slice(-35,-5),21);
+  let prevDiff=((prevE9-prevE21)/prevE21)*100;
+  let expanding=diff>prevDiff*0.95;
+  let thr=tf==='4H'?1.8:0.8,rsiT=tf==='4H'?48:45;
+  if((m10>thr||m5>thr*0.5)&&r>rsiT&&v>0.6&&expanding&&diff>-0.1)return'MOMENTUM';
+  if(last>e9&&e9>e21&&r>50&&m5>0.3&&diff>-0.2)return'CONTINUATION';
+  if((m10>thr*0.2||m5>thr*0.15)&&r>40&&diff>-0.5)return'SWING';
+  if(ap<3.0)return'GRID';  return'NEUTRAL';
+}
+function merge(s1,s2){
+  if(s1===s2)return s1+' ';
+  if(s1==='MOMENTUM'||s2==='MOMENTUM')return'MOMENTUM';
+  if(s1==='CONTINUATION'||s2==='CONTINUATION')return'CONTINUATION';
+  if(s1==='SWING'||s2==='SWING')return'SWING';
+  if(s1==='GRID'||s2==='GRID')return'GRID';
+  return'NEUTRAL';
+}
+function whaleFilter(v1,v4,ap4,price,ema21_4){return(v1>1.2||v4>1.2)&&ap4>1.2&&price>ema21_4*0.99;}
+function score(str,r1,r4,v1,v4){
+  let s=0;
+  if(str.includes('MOMENTUM'))s+=50;else if(str.includes('CONTINUATION'))s+=45;else if(str.includes('SWING'))s+=35;else s+=20;
+  if(str.includes('⚡'))s+=15;
+  if((r1>45&&r1<75)&&(r4>45&&r4<75))s+=15;
+  if(v1>0.8&&v4>0.7)s+=10;
+  return s;
+}
+function calculateRisk(entry,stop,tp1,balance=accountBalance,riskPct=riskPerTrade){
+  if(!entry||!stop||!tp1)return null;
+  let riskUSD=balance*riskPct,stopDist=Math.abs(entry-stop)/entry;
+  if(stopDist<=0.001)return null;
+  let positionSize=riskUSD/stopDist,rewardPct=((tp1-entry)/entry)*100;
+  let rr=(entry!==stop)?(tp1-entry)/(entry-stop):0;
+  return{riskUSD:riskUSD.toFixed(2),size:positionSize.toFixed(2),stopPct:(stopDist*100).toFixed(2)+'%',reward1:rewardPct.toFixed(1)+'%',rr:rr.toFixed(2)};
+}
+
+// ================= LEVELS & GRID =================
+function getLevels(c,price,atr,e9,e21,btcWeather=null,sym=""){
+  if(!c||c.length<20)return{pullback:price,stop:price*0.95,tp1:price*1.05};
+  let lo=Math.min(...c.slice(-20)),hi=Math.max(...c.slice(-20));
+  let basePull=Math.max(lo*1.01,e9),regimeDiscount=0;
+  if(btcWeather&&btcWeather.sentiment==='BEARISH'){
+    let btcDrop=Math.abs(btcWeather.priceChangePct||0);
+    if(btcDrop>=2.0){let beta=getCoinBeta(sym),adj=Math.min(beta,5)+Math.log(Math.max(beta,1));regimeDiscount=Math.min(btcDrop*adj*0.4,10)/100;}
   }
-  if (losses === 0) return 100;
-  const avgGain = gains / period;
-  const avgLoss = losses / period;
-  const rs = avgGain / avgLoss;
-  return 100 - (100 / (1 + rs));
+  return{pullback:basePull*(1-regimeDiscount),basePullback:basePull,stop:e21*0.97,tp1:hi,tp2:price+(atr*3)};
 }
+function gridLvl(price,ap){let step=price*(ap/100)*1.2,n=ap<2?12:ap<4?10:8;return{low:price-(step*n),high:price+(step*n),step,n};}
+function buildGridLevels(low,high,n){let levels=[],range=high-low;for(let i=0;i<=n;i++){let factor=Math.pow(i/n,1.2);levels.push((low+range*factor).toFixed(4));}return levels;}
 
-function calculateEMA(prices, period) {
-  if (prices.length < period) return prices.length ? prices[prices.length - 1] : null;
-  let sum = 0;
-  for (let i = 0; i < period; i++) sum += prices[i];
-  let ema = sum / period;
-  const k = 2 / (period + 1);
-  for (let i = period; i < prices.length; i++) {
-    ema = (prices[i] * k) + (ema * (1 - k));
+// ================= REGIME & TP ENGINE =================
+async function getBTCWeather(){
+  try{
+    const k4=await safeGetKlines('BTCUSDT','linear','240');
+    if(!k4.length)return null;
+    const c4=k4.map(k=>k.c),price=c4[c4.length-2],startPrice=c4[c4.length-6];
+    const pct=((price-startPrice)/startPrice)*100;
+    let sentiment='NEUTRAL',color='#ffcc00',advice='Wait for confirmation';    if(pct<=-2.0){sentiment='BEARISH';color='#ff5555';advice='🔴 DUMP: Wick-hunt only';}
+    else if(pct>=0.5){sentiment='BULLISH';color='#00ff99';advice='🟢 RECOVERY: Momentum breakouts';}
+    return{price,priceChangePct:pct,sentiment,color,advice};
+  }catch(e){return null;}
+}
+function getMarketRegime(btcWeather){
+  if(!btcWeather)return"CHOP";
+  const pct=btcWeather.priceChangePct||0;
+  if(btcWeather.sentiment==="BEARISH"&&pct<=-2.0)return"RISK_OFF";
+  if(Math.abs(pct)<0.8)return"CHOP";
+  if(btcWeather.sentiment==="BULLISH"||pct>0.8)return"BULL";
+  return"CHOP";
+}
+function applyRegimeFilter(regime,strategy,ap4,v4,r4,sc){
+  if(regime==="RISK_OFF"){
+    if(strategy.includes("MOMENTUM"))return ap4>3.5&&v4>1.3&&r4>55&&sc>55;
+    if(strategy.includes("CONTINUATION"))return sc>45;
+    return strategy.includes("SWING");
   }
-  return ema;
+  if(regime==="CHOP"){
+    if(strategy.includes("MOMENTUM"))return false;
+    if(strategy.includes("CONTINUATION"))return true;
+    return strategy.includes("SWING");
+  }
+  return true;
 }
-
-function calculateVolumeRatio(vols, lookback = 20) {
-  if (vols.length < lookback + 1) return 1;
-  const current = vols[vols.length - 1];
-  const prev = vols.slice(-lookback - 1, -1);
-  const avg = prev.reduce((a, b) => a + b, 0) / lookback;
-  return current / avg;
+function getTPClass(ap4,vol,strategy,regime){
+  if(regime==="RISK_OFF")return 5;
+  if(regime==="CHOP"){if(strategy.includes("SWING"))return 5;if(strategy.includes("CONTINUATION"))return 10;return 10;}
+  if(regime==="BULL"){
+    if(strategy.includes("MOMENTUM")){if(ap4>=6&&vol>=1.5)return 20;return 15;}
+    if(strategy.includes("CONTINUATION")){if(ap4>=4)return 15;return 10;}
+    return 10;
+  }
+  return 5;
 }
-
-function validateGrid(klines) {
-  if (klines.length < 96 * 4) return null;
-  const last4d = klines.slice(-96 * 4);
-  const highs = last4d.map(k => k.high);
-  const lows = last4d.map(k => k.low);
-  const support = Math.min(...lows);
-  const resistance = Math.max(...highs);
-  const rangePct = ((resistance - support) / support) * 100;
-  if (rangePct < CONFIG.gridRangeMin || rangePct > CONFIG.gridRangeMax) return null;
-
-  let sTouches = 0, rTouches = 0;
-  const thresh = 0.005;  last4d.forEach(k => {
-    if (k.low <= support * (1 + thresh)) sTouches++;
-    if (k.high >= resistance * (1 - thresh)) rTouches++;
-  });
-  if (sTouches < CONFIG.gridMinTouches || rTouches < CONFIG.gridMinTouches) return null;
-
-  const current = klines[klines.length - 1].close;
-  const pos = (current - support) / (resistance - support);
-  if (pos < 0.2 || pos > 0.8) return null;
-
-  const closes = klines.map(k => k.close);
-  const ema28 = calculateEMA(closes, 28);
-  const ema28Prev = calculateEMA(closes.slice(0, -1), 28);
-  const slope = Math.abs(ema28 - ema28Prev) / ema28Prev;
-  if (slope > CONFIG.emaSlopeMax) return null;
-
-  return {
-    support,
-    resistance,
-    rangePct,
-    touches: { support: sTouches, resistance: rTouches },
-    currentPosition: (pos * 100).toFixed(1)
-  };
+function getAutoTP(entry,regime,ap4=0,v4=1,strategy="SWING"){
+  let tp1=entry*1.05,tp2=entry*1.10;
+  if(regime==="RISK_OFF")return{tp1:entry*1.03,tp2:entry*1.05,note:"SCALP MODE"};
+  if(regime==="CHOP")return{tp1:entry*1.05,tp2:entry*1.08,note:"RANGE MODE"};
+  if(regime==="BULL"){
+    if(strategy.includes("MOMENTUM")&&ap4>3&&v4>1.2){tp1=entry*1.08;tp2=entry*1.15;}
+    else if(strategy.includes("CONTINUATION")){tp1=entry*1.05;tp2=entry*1.10;}
+    else{tp1=entry*1.04;tp2=entry*1.08;}
+    return{tp1,tp2,note:"TREND MODE"};
+  }
+  return{tp1,tp2,note:"DEFAULT"};
 }
-
-// --- MAIN SCAN FUNCTION ---
-async function scanLive() {
-  const scanBtn = document.getElementById('scanBtn');
-  const status = document.getElementById('status');
-  const resultDiv = document.getElementById('result');
-  const progressFill = document.getElementById('progressFill');
-  const coinTableContainer = document.getElementById('coinTableContainer');
-
-  const scanMode = scanModeSelect.value;
-  const minVol = parseFloat(minVolumeInput.value);
-
-  scanBtn.disabled = true;
-  scanBtn.textContent = '⏳ Scanning...';
-  status.innerHTML = 'Starting scan...';
-  resultDiv.innerHTML = '';
-  debugLog = [];
-  logDebug('=== Starting new scan (RSI locked per strategy) ===');
-
-  const validSignals = [];
-  const coinData = [];
-  const totalCoins = COIN_UNIVERSE.length;
-  let scanned = 0;
-
-  for (const symbol of COIN_UNIVERSE) {
-    try {      logDebug(`\n=== Scanning ${symbol} ===`);
-      status.innerHTML = `Scanning ${symbol} (${scanned + 1}/${totalCoins})...`;
-      progressFill.style.width = `${((scanned + 1) / totalCoins) * 100}%`;
-
-      // Retry logic for API failures
-      let data = null;
-      let retries = 0;
-      while (!data && retries < 2) {
-        try {
-          const url = `https://api.bybit.com/v5/market/kline?category=linear&symbol=${symbol}&interval=15&limit=500`;
-          const resp = await fetch(url);
-          data = await resp.json();
-          if (data.retCode !== 0 || !data.result?.list) {
-            logDebug(`API error for ${symbol}: ${data.retMsg || 'No data'}`);
-            data = null;
-          }
-        } catch (err) {
-          logDebug(`Fetch failed for ${symbol}, retrying...`);
-          await new Promise(r => setTimeout(r, 1000));
-        }
-        retries++;
-      }
-
-      if (!data) {
-        logDebug(`❌ Failed to fetch data for ${symbol} after 2 retries`);
-        scanned++;
-        continue;
-      }
-
-      const klines = data.result.list.map(c => ({
-        time: parseInt(c[0]),
-        open: parseFloat(c[1]),
-        high: parseFloat(c[2]),
-        low: parseFloat(c[3]),
-        close: parseFloat(c[4]),
-        volume: parseFloat(c[5])
-      })).reverse();
-
-      if (klines.length < 100) {
-        logDebug('Insufficient klines');
-        scanned++;
-        continue;
-      }
-
-      const closes = klines.map(k => k.close);
-      const vols = klines.map(k => k.volume);
-      const price = closes[closes.length - 1];
-
-      // ✅ STRATEGY-LOCKED RSI: ALWAYS USE 6 AND 14
-      const rsi6 = calculateRSI(closes, 6);      const rsi14 = calculateRSI(closes, 14);
-      const ema7 = calculateEMA(closes, 7);
-      const ema28 = calculateEMA(closes, 28);
-      const volRatio = calculateVolumeRatio(vols);
-      const grid = validateGrid(klines);
-
-      // Log user selection vs actual usage
-      const userRsi = rsiPeriodSelect.value;
-      if (userRsi !== '6') {
-        logDebug(`Note: Display shows RSI(${userRsi}), but signals use RSI(6)/RSI(14)`);
-      }
-
-      coinData.push({ symbol, price, rsi6, rsi14, ema7, ema28, volRatio, grid });
-
-      // --- FLASH SIGNALS ---
-      if (scanMode === 'full' || scanMode === 'flash') {
-        if (rsi6 < 22 && rsi14 < 30 && volRatio >= Math.max(minVol, 2.0) && price >= ema7 * 0.98) {
-          const tp = (price * 1.20).toFixed(4);
-          validSignals.push({
-            type: 'flash',
-            symbol,
-            message: `🟢 FLASH 5x: ${symbol} | RSI6:${rsi6.toFixed(1)} RSI14:${rsi14.toFixed(1)} | Vol:${volRatio.toFixed(1)}× | TP:+20% → ${tp}`
-          });
-        }
-        else if (rsi6 >= 22 && rsi6 < 27 && rsi14 >= 30 && rsi14 < 40 && volRatio >= Math.max(minVol, 1.5) && price >= ema7 * 0.98) {
-          const tp = (price * 1.15).toFixed(4);
-          validSignals.push({
-            type: 'flash',
-            symbol,
-            message: `🟡 FLASH 3x: ${symbol} | RSI6:${rsi6.toFixed(1)} RSI14:${rsi14.toFixed(1)} | Vol:${volRatio.toFixed(1)}× | TP:+15% → ${tp}`
-          });
-        }
-      }
-
-      // --- CHAOS SIGNALS ---
-      if (scanMode === 'full' || scanMode === 'chaos') {
-        const recentHigh = Math.max(...klines.slice(-20).map(k => k.high));
-        const dropPct = ((recentHigh - price) / recentHigh) * 100;
-        if (rsi6 < 15 && rsi14 < 25 && volRatio >= Math.max(minVol, 3.0) && dropPct >= CONFIG.chaosDropMin) {
-          const tp = (price * 1.20).toFixed(4);
-          validSignals.push({
-            type: 'chaos',
-            symbol,
-            message: `🔴 CHAOS: ${symbol} | RSI6:${rsi6.toFixed(1)} RSI14:${rsi14.toFixed(1)} | Vol:${volRatio.toFixed(1)}× | Drop:-${dropPct.toFixed(0)}% | TP:+20% → ${tp}`
-          });
-        }
-      }
-
-      // --- GRID SIGNALS ---
-      if (scanMode === 'full' || scanMode === 'grid') {        if (grid && rsi6 >= 35 && rsi6 <= 50 && rsi14 >= 40 && rsi14 <= 60) {
-          validSignals.push({
-            type: 'grid',
-            symbol,
-            message: `🟠 GRID: ${symbol} | Range:${grid.support.toFixed(4)}-${grid.resistance.toFixed(4)} (${grid.rangePct.toFixed(2)}%) | Pos:${grid.currentPosition}% | Validated 4 days`
-          });
-        }
-      }
-
-      scanned++;
-      await new Promise(r => setTimeout(r, 300));
-
-    } catch (err) {
-      logDebug(`❌ Error scanning ${symbol}: ${err.message}`);
-      scanned++;
-      continue;
+function getExitPlan(tp1,tp2){return{exit1:"SELL 50% @ TP1",exit2:"SELL 50% @ TP2",trailing:"Move SL to BE after TP1 hit",tp1,tp2};}
+// ================= 🚫 ANTI-REENTRY & QUALITY FILTERS =================
+function isWeakReEntry(r4,v4,ap4,strategy){
+  if(!strategy.includes('SWING')){
+    if(r4<45&&v4<0.9&&ap4<2.0)return true;
+  }
+  return false;
+}
+function checkReEntryBlock(sym,currentCandleTime){
+  if(recentSetups.has(sym)){
+    const last=recentSetups.get(sym);
+    const diff=(currentCandleTime-last.t)/(4*60*60*1000);
+    if(diff<REENTRY_BLOCK_CANDLES){
+      if(last.r4>=currentR4||last.v4>=currentV4)return true;
     }
   }
-
-  progressFill.style.width = '100%';
-
-  if (validSignals.length > 0) {
-    resultDiv.innerHTML = validSignals.map(s => `<div class="signal ${s.type}">${s.message}</div>`).join('');
-    status.innerHTML = `✅ Scan complete. Found ${validSignals.length} signals.`;
-  } else {
-    resultDiv.innerHTML = '⏳ No valid setups found.\nWait for clear signals.';
-    status.innerHTML = 'Scan complete. No signals found.';
+  return false;
+}
+function recordSetup(sym,t,r4,v4){
+  recentSetups.set(sym,{t,r4,v4});
+  const now=Date.now();
+  for(const[k,v]of recentSetups.entries()){
+    if((now-v.t)>(24*60*60*1000))recentSetups.delete(k);
   }
-
-  generateCoinTable(coinData);
-  scanBtn.disabled = false;
-  scanBtn.textContent = '🌐 Scan Live Coin Universe';
-  logDebug('=== Scan complete ===');
 }
 
-function generateCoinTable(coinData) {
-  const container = document.getElementById('coinTableContainer');
-  if (!coinData || coinData.length === 0) {
-    container.innerHTML = '<p>No coin data available.</p>';
-    return;
+// ================= CORE PROCESSOR =================
+function processCoin(sym,k1,k4,mode,btcWeather,res){
+  let a1=calcATR(k1),a4=calcATR(k4);
+  let p1=k1.at(-1).c,p4=k4.at(-1).c;
+  let ap1=(a1/p1)*100,ap4=(a4/p4)*100;
+  if(mode==='CORE'){if(ap1<0.25&&ap4<0.25)return;}else{if(ap1<0.55&&ap4<0.55)return;}
+  if(ap1>15&&ap4>15)return;
+  let c1=k1.map(x=>x.c),c4=k4.map(x=>x.c);
+  let r1=calcRSI(c1),r4=calcRSI(c4),v1=volRatio(k1),v4=volRatio(k4);
+  let e9_1=ema(c1.slice(-20),9),e21_1=ema(c1.slice(-20),21);
+  let e9_4=ema(c4.slice(-20),9),e21_4=ema(c4.slice(-20),21);
+  const dollarVol=p4*k4.at(-1).v;
+  if(dollarVol<MIN_DOLLAR_VOL)return;
+  let s1=getStrat(ap1,r1,v1,c1,'1H'),s4=getStrat(ap4,r4,v4,c4,'4H');
+  let fin=merge(s1,s4);
+  const regime=getMarketRegime(btcWeather);
+  let sc=score(fin,r1,r4,v1,v4);
+  if(!applyRegimeFilter(regime,fin,ap4,v4,r4,sc))return;
+  
+  currentR4=r4;currentV4=v4;
+  if(checkReEntryBlock(sym,k4.at(-1).t))return;
+  if(isWeakReEntry(r4,v4,ap4,fin))return;
+  
+  if(mode==='CORE'){if(fin==='NEUTRAL')return;}
+  else if(mode==='SPOT'||mode==='FUTURES'){if(!fin.includes('SWING')&&!fin.includes('MOMENTUM')&&!fin.includes('CONTINUATION'))return;}  else if(mode==='GRID'){if(!fin.includes('GRID'))return;}
+  if(mode==='FUTURES'&&fin.includes('MOMENTUM')){if(!whaleFilter(v1,v4,ap4,p4,e21_4))return;if(sc<55)return;}
+  if(btcWeather?.sentiment==='BEARISH'&&fin.includes('MOMENTUM'))fin=fin.replace('MOMENTUM','SWING');
+  let noGrid=fin.includes('MOMENTUM');
+  if(btcWeather?.sentiment==='BEARISH'&&ap4>5)noGrid=true;
+  let lv=getLevels(c4,p4,a4,e9_4,e21_4,btcWeather,sym);
+  let entry=lv.pullback;
+  let tpData=getAutoTP(entry,regime,ap4,v4,fin);
+  let exitPlan=getExitPlan(tpData.tp1,tpData.tp2);
+  let gl=fin.includes('GRID')&&!noGrid?gridLvl(p4,ap4):null;
+  let risk=null;
+  if((fin.includes('SWING')||fin.includes('MOMENTUM')||fin.includes('CONTINUATION'))){
+    risk=calculateRisk(entry,lv.stop,tpData.tp1);
+    if(risk&&parseFloat(risk.rr)<minRR)return;
   }
-
-  let html = `
-    <div style="overflow-x: auto;">
-      <table class="coin-table">
-        <thead>
-          <tr>
-            <th>Coin</th>
-            <th>Price</th>
-            <th>RSI6</th>            <th>RSI14</th>
-            <th>EMA7</th>
-            <th>EMA28</th>
-            <th>Vol Ratio</th>
-            <th>Grid Support</th>
-            <th>Grid Resistance</th>
-            <th>Grid Range%</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-
-  coinData.forEach(c => {
-    const gS = c.grid ? c.grid.support.toFixed(4) : '-';
-    const gR = c.grid ? c.grid.resistance.toFixed(4) : '-';
-    const gRange = c.grid ? c.grid.rangePct.toFixed(2) : '-';
-
-    let rsiColor = '#f0f0f0';
-    if (c.rsi6 < 30) rsiColor = '#ef4444';   // oversold
-    else if (c.rsi6 > 70) rsiColor = '#10b981'; // overbought
-
-    html += `
-      <tr>
-        <td><strong>${c.symbol}</strong></td>
-        <td>${c.price.toFixed(4)}</td>
-        <td style="color: ${rsiColor}">${c.rsi6.toFixed(2)}</td>
-        <td>${c.rsi14.toFixed(2)}</td>
-        <td>${c.ema7 ? c.ema7.toFixed(4) : '-'}</td>
-        <td>${c.ema28 ? c.ema28.toFixed(4) : '-'}</td>
-        <td>${c.volRatio.toFixed(2)}</td>
-        <td>${gS}</td>
-        <td>${gR}</td>
-        <td>${gRange}</td>
-      </tr>
-    `;
-  });
-
-  html += `</tbody></table></div>`;
-  container.innerHTML = html;
+  if(fin.includes('SWING')&&sc<42)return;
+  if(fin.includes('CONTINUATION')&&sc<42)return;
+  if(fin.includes('MOMENTUM')&&sc<50)return;
+  
+  recordSetup(sym,k4.at(-1).t,r4,v4);
+  res.push({sym,price:p4,s1,s4,fin,r1,r4,ap1,ap4,v1,v4,e9_1,e21_1,e9_4,e21_4,sc,lv,gl,noGrid,risk,rr:risk?parseFloat(risk.rr):0,entry:entry,tp1:tpData.tp1,tp2:tpData.tp2,exitPlan:exitPlan,regime:regime,tpNote:tpData.note});
 }
+
+// ================= MAIN SCAN =================
+async function scan(list,cat,mode='CORE'){
+  scanAbort=false;
+  let out=document.getElementById('out'),pbar=document.getElementById('pbar');
+  let stat=document.getElementById('status');
+  out.innerHTML='';pbar.style.width='0%';
+  stat.innerHTML=` Scanning ${mode} | ${list.length} coins...`;
+  const btcWeather=await getBTCWeather();
+  const regime=getMarketRegime(btcWeather);
+  let res=[],scannedCount=0,failedCount=0;
+  for(let i=0;i<list.length;i+=CHUNK_SIZE){
+    if(scanAbort)break;
+    const chunk=list.slice(i,i+CHUNK_SIZE);
+    await Promise.all(chunk.map(async(sym)=>{
+      if(scanAbort)return;
+      if((mode==='SPOT'||mode==='FUTURES')&&SLOW_COINS.has(sym))return;
+      try{
+        let[k1,k4]=await Promise.all([safeGetKlines(sym,cat,'60'),safeGetKlines(sym,cat,'240')]);
+        if(!k1?.length||!k4?.length){failedCount++;return;}
+        scannedCount++;
+        processCoin(sym,k1,k4,mode,btcWeather,res);
+      }catch(e){failedCount++;}
+    }));
+    let pct=Math.min(100,((i+CHUNK_SIZE)/list.length)*100);
+    pbar.style.width=pct+'%';
+    await new Promise(r=>setTimeout(r,CHUNK_DELAY));
+  }  res.sort((a,b)=>{if(b.sc!==a.sc)return b.sc-a.sc;return b.rr-a.rr;});
+  render(res.slice(0,MAX_DISPLAY),btcWeather,regime);
+  const rate=list.length>0?Math.round((scannedCount/list.length)*100):0;
+  if(res.length===0){
+    if(failedCount>list.length*0.5){stat.innerHTML=`❌ API ERROR | ${failedCount}/${list.length} failed • Try again`;}
+    else{stat.innerHTML=`⚠️ NO TRADEABLE SETUPS | ${regime} MODE | Scanned: ${scannedCount}/${list.length} (${rate}%)`;}
+  }else{stat.innerHTML=`✅ ${mode} | ${res.length} SETUP${res.length>1?'S':''} FOUND | ${regime}`;}
+}
+
+// ================= RENDER =================
+function render(data,btcWeather,regime="CHOP"){
+  let el=document.getElementById('out'),weatherHTML='';
+  if(btcWeather){
+    const sign=btcWeather.priceChangePct>=0?'+':'';
+    weatherHTML=`<div class="card" style="border:2px solid ${btcWeather.color};margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:14px;color:#fff;">📊 BTC REGIME</strong><span style="background:${btcWeather.color};color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:12px;">${btcWeather.sentiment} • ${regime}</span></div><div style="margin-top:6px;font-size:12px;color:#7a8594;">Change: <span style="color:${btcWeather.priceChangePct>=0?'#00ff99':'#ff5555'}">${sign}${btcWeather.priceChangePct.toFixed(2)}%</span> | Price: ${btcWeather.price.toFixed(0)}</div><div style="margin-top:4px;font-size:11px;color:${btcWeather.color};">${btcWeather.advice}</div></div>`;
+  }
+  if(!data.length){el.innerHTML=weatherHTML+`<div class="card error">NO TRADEABLE SETUPS • ${regime} mode active</div>`;return;}
+  el.innerHTML=weatherHTML+data.map(d=>{
+    let bias=d.fin.includes('MOMENTUM')?'🟢 LONG BIAS (MOMENTUM)':d.fin.includes('CONTINUATION')?'🟢 LONG BIAS (CONTINUATION)':d.fin.includes('SWING')?'🟢 LONG BIAS (SWING)':'🟡 GRID RANGE';
+    let signal=d.noGrid?'':`<div class="box"><span style="color:#00ff99">📥 ENTRY:</span> ${d.entry.toFixed(4)}<br><span style="color:#ffcc00">🎯 TP1:</span> ${d.tp1.toFixed(4)}<br><span style="color:#00c2ff"> TP2:</span> ${d.tp2.toFixed(4)}<br><span style="color:#ff5555">🛑 STOP:</span> ${d.lv.stop.toFixed(4)}<br><span style="color:#7a8594;font-size:10px;margin-top:4px;display:block;">${d.exitPlan.exit1} • ${d.exitPlan.exit2}<br>${d.exitPlan.trailing}</span>${d.risk?`<br><span style="color:#ffcc00">💰 RISK: ${d.risk.riskUSD} | SIZE: ${d.risk.size}</span>`:''}</div>`;
+    return `<div class="card"><strong style="font-size:15px;">${d.sym}</strong> <span style="color:#00ff99;margin-left:5px;">${bias}</span><br><br><div class="tf1h">1H: ${d.s1} | RSI:${Math.round(d.r1)}</div><div class="tf4h">4H: ${d.s4} | RSI:${Math.round(d.r4)}</div><br>${signal}</div>`;
+  }).join('');
+}
+
+// ================= BUTTONS =================
+async function scanCore(){scanAbort=true;setTimeout(()=>scan(core,"linear","CORE"),50);}
+async function scanSpot(){scanAbort=true;document.getElementById('status').innerHTML='🔄 Fetching SPOT symbols...';let d=await fetchBybit('/v5/market/instruments-info',{category:'spot'});if(!d?.result?.list){document.getElementById('status').innerHTML='❌ Symbol fetch failed • Check connection';return;}scan(d.result.list.map(x=>x.symbol).filter(x=>x.includes('USDT')).slice(0,150),'spot','SPOT');}
+async function scanFutures(){scanAbort=true;document.getElementById('status').innerHTML='🔄 Fetching FUTURES symbols...';let d=await fetchBybit('/v5/market/instruments-info',{category:'linear'});if(!d?.result?.list){document.getElementById('status').innerHTML='❌ Symbol fetch failed • Check connection';return;}scan(d.result.list.map(x=>x.symbol).filter(x=>x.includes('USDT')).slice(0,150),'linear','FUTURES');}
+async function scanGrid(){scanAbort=true;document.getElementById('status').innerHTML='🔄 Fetching symbols for GRID...';let d=await fetchBybit('/v5/market/instruments-info',{category:'linear'});if(!d?.result?.list){document.getElementById('status').innerHTML='❌ Symbol fetch failed • Check connection';return;}scan(d.result.list.map(x=>x.symbol).filter(x=>x.includes('USDT')).slice(0,150),'linear','GRID');}
+
+async function testConnection(){const stat=document.getElementById('status');stat.innerHTML='🔄 Testing API connection...';const test=await fetchBybit('/v5/market/kline',{category:'linear',symbol:'BTCUSDT',interval:'60',limit:'5'});if(test&&test.result?.list?.length>0){stat.innerHTML='✅ API CONNECTED • Ready to scan';}else{stat.innerHTML='❌ API FAILED • Try: 1) Refresh page 2) Use Chrome 3) Disable adblock';}}
+document.addEventListener('DOMContentLoaded',()=>{const btnContainer=document.querySelector('div[style*="justify-content:center"]');if(btnContainer){const testBtn=document.createElement('button');testBtn.className='grid';testBtn.textContent='TEST API';testBtn.onclick=testConnection;btnContainer.appendChild(testBtn);}});
 </script>
-
-<div class="footer">
-  <p>Mobile Optimized • RSI(6)+RSI(14) Locked • MT-Validated Grid</p>
-  <p>v3.5.5 | Flash x5 / Grid x3 / Chaos | Auto-Retry on API Fail</p>
-</div>
-
 </body>
 </html>
