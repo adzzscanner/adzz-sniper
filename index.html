@@ -38,33 +38,51 @@ button{padding:10px;margin:5px;border:none;font-weight:bold;border-radius:8px;cu
 <div id="status" style="text-align:center;color:#7a8594;margin:8px 0;font-size:12px;">Ready</div>
 <div class="progress"><div class="progress-bar" id="pbar"></div></div>
 <div id="out"></div>
+
 <script>
 // ================= CONFIG =================
-const MAX_DISPLAY = 3;
+const MAX_DISPLAY = 5;
 const CHUNK_SIZE = 3;
 const CHUNK_DELAY = 400;
 const MIN_CANDLES = 30;
 const MIN_DOLLAR_VOL = 500000;
 const REENTRY_BLOCK_CANDLES = 6;
-
 let scanAbort = false;let accountBalance = 500;
 let riskPerTrade = 0.02;
 let minRR = 1.0;
 let recentSetups = new Map();
 let currentR4 = 0, currentV4 = 0;
+let activeTrades = new Map();
+
+// === Portfolio Heat Control ===
+const SECTOR_LIMITS = {"AI":1,"SOL":1,"L1":1,"L2":1,"CHAOS":1,"DEFI":1,"MAJOR":2};
+const STRAT_LIMITS = {"MOMENTUM":2,"CONTINUATION":2,"SWING":3,"GRID":4};
+const COIN_SECTOR = {
+  "RENDERUSDT":"AI","FETUSDT":"AI","TAOUSDT":"AI","WLDUSDT":"AI",
+  "JUPUSDT":"SOL","BONKUSDT":"SOL","WIFUSDT":"SOL","PYTHUSDT":"SOL","JTOUSDT":"SOL",
+  "SEIUSDT":"L2","SUIUSDT":"L1","INJUSDT":"L1","TIAUSDT":"L1","ARBUSDT":"L2","OPUSDT":"L2",
+  "XAIUSDT":"CHAOS","HYPEUSDT":"CHAOS","HYPERUSDT":"CHAOS",
+  "DYDXUSDT":"DEFI","ENAUSDT":"DEFI","PENDLEUSDT":"DEFI","ETHFIUSDT":"DEFI",
+  "BTCUSDT":"MAJOR","ETHUSDT":"MAJOR","BNBUSDT":"MAJOR","XRPUSDT":"MAJOR","ADAUSDT":"MAJOR"
+};
+function getSector(sym){return COIN_SECTOR[sym]||"OTHER";}
+
+// === Strict Quality Gates ===
+const MIN_SCORE = {"MOMENTUM":55,"CONTINUATION":50,"SWING":45,"GRID":40};
+const MIN_RSI = 40, MAX_RSI = 75;
+const MIN_VOL_RATIO = 0.8;
+
+// === Ranking System ===
+const RANK_COLORS = {"1":"#00ff99","2":"#00c2ff","3":"#ffcc00","4":"#ff9900","5":"#ff5555"};
+const RANK_LABELS = {"MOMENTUM":"1","CONTINUATION":"2","SWING":"3","GRID":"4","NEUTRAL":"5"};
 
 // ✅ FINAL 22-COIN CORE LIST
 const core = [
-  // AI / INFRA
-  "RENDERUSDT", "FETUSDT", "TAOUSDT", "WLDUSDT",
-  // SOLANA
-  "JUPUSDT", "BONKUSDT", "WIFUSDT", "PYTHUSDT", "JTOUSDT",
-  // L1/L2
-  "SEIUSDT", "SUIUSDT", "INJUSDT", "TIAUSDT", "ARBUSDT", "OPUSDT",
-  // CHAOS
-  "XAIUSDT", "HYPEUSDT", "HYPERUSDT",
-  // DEFI
-  "DYDXUSDT", "ENAUSDT", "PENDLEUSDT", "ETHFIUSDT"
+"RENDERUSDT", "FETUSDT", "TAOUSDT", "WLDUSDT",
+"JUPUSDT", "BONKUSDT", "WIFUSDT", "PYTHUSDT", "JTOUSDT",
+"SEIUSDT", "SUIUSDT", "INJUSDT", "TIAUSDT", "ARBUSDT", "OPUSDT",
+"XAIUSDT", "HYPEUSDT", "HYPERUSDT",
+"DYDXUSDT", "ENAUSDT", "PENDLEUSDT", "ETHFIUSDT"
 ];
 
 const SLOW_COINS = new Set(["BTCUSDT","ETHUSDT","BNBUSDT","XRPUSDT","ADAUSDT","DOTUSDT","LTCUSDT","BCHUSDT"]);
@@ -73,296 +91,380 @@ function getCoinBeta(sym){return COIN_BETA[sym]||COIN_BETA["DEFAULT"];}
 
 // ================= 🔧 ROBUST API =================
 async function fetchBybit(endpoint,params={}){
-  const q=new URLSearchParams(params).toString();
-  const baseUrl=`https://api.bybit.com${endpoint}${q?'?'+q:''}`;
-  const proxies=[(url)=>`https://corsproxy.io/?${encodeURIComponent(url)}`,(url)=>url];
-  for(const buildProxy of proxies){
-    try{
-      const proxyUrl=buildProxy(baseUrl);
-      const controller=new AbortController();
-      const timeout=setTimeout(()=>controller.abort(),12000);
-      const response=await fetch(proxyUrl,{signal:controller.signal,headers:{'Accept':'application/json'}});
-      clearTimeout(timeout);
-      if(!response.ok)continue;
-      const text=await response.text();
-      if(text.includes('<html')||text.includes('DOCTYPE')||text.length<20)continue;
-      let data;try{data=JSON.parse(text);}catch(e){continue;}
-      if(data&&(data.retCode===0||data.success===true||(data.result&&Array.isArray(data.result.list))))return data;
-    }catch(e){continue;}
-  }
-  return null;
+const q=new URLSearchParams(params).toString();
+const baseUrl=`https://api.bybit.com${endpoint}${q?'?'+q:''}`;
+const proxies=[(url)=>`https://corsproxy.io/?${encodeURIComponent(url)}`,(url)=>url];
+for(const buildProxy of proxies){
+try{
+const proxyUrl=buildProxy(baseUrl);const controller=new AbortController();
+const timeout=setTimeout(()=>controller.abort(),12000);
+const response=await fetch(proxyUrl,{signal:controller.signal,headers:{'Accept':'application/json'}});
+clearTimeout(timeout);
+if(!response.ok)continue;
+const text=await response.text();
+if(text.includes('<html')||text.includes('DOCTYPE')||text.length<20)continue;
+let data;try{data=JSON.parse(text);}catch(e){continue;}
+if(data&&(data.retCode===0||data.success===true||(data.result&&Array.isArray(data.result.list))))return data;
+}catch(e){continue;}
+}
+return null;
 }
 
 async function safeGetKlines(sym,cat,intv){
-  const data=await fetchBybit('/v5/market/kline',{category:cat,symbol:sym,interval:intv,limit:'100'});
-  if(!data)return[];
-  const list=data.result?.list||data.data?.list||[];  if(!Array.isArray(list)||list.length===0)return[];
-  try{return list.map(k=>({t:parseInt(k[0]),o:parseFloat(k[1]),h:parseFloat(k[2]),l:parseFloat(k[3]),c:parseFloat(k[4]),v:parseFloat(k[5])})).reverse();}
-  catch(e){return[];}
+const data=await fetchBybit('/v5/market/kline',{category:cat,symbol:sym,interval:intv,limit:'100'});
+if(!data)return[];
+const list=data.result?.list||data.data?.list||[];
+if(!Array.isArray(list)||list.length===0)return[];
+try{return list.map(k=>({t:parseInt(k[0]),o:parseFloat(k[1]),h:parseFloat(k[2]),l:parseFloat(k[3]),c:parseFloat(k[4]),v:parseFloat(k[5])})).reverse();}
+catch(e){return[];}
 }
 
 // ================= INDICATORS =================
 function calcRSI(c,p=14){
-  if(!c||c.length<p+2)return 50;
-  let g=0,l=0;
-  for(let i=1;i<=p;i++){let d=c[i]-c[i-1];d>=0?g+=d:l+=Math.abs(d);}
-  let ag=g/p,al=l/p;
-  for(let i=p;i<c.length;i++){let d=c[i]-c[i-1];if(d>=0){ag=(ag*(p-1)+d)/p;al=(al*(p-1))/p;}else{ag=(ag*(p-1))/p;al=(al*(p-1)+Math.abs(d))/p;}}
-  return 100-(100/(1+ag/(al||1)));
+if(!c||c.length<p+2)return 50;
+let g=0,l=0;
+for(let i=1;i<=p;i++){let d=c[i]-c[i-1];d>=0?g+=d:l+=Math.abs(d);}
+let ag=g/p,al=l/p;
+for(let i=p;i<c.length;i++){let d=c[i]-c[i-1];if(d>=0){ag=(ag*(p-1)+d)/p;al=(al*(p-1))/p;}else{ag=(ag*(p-1))/p;al=(al*(p-1)+Math.abs(d))/p;}}
+return 100-(100/(1+ag/(al||1)));
 }
 function calcATR(kl,p=14){
-  if(!kl||kl.length<p+1)return 0;
-  let tr=[];
-  for(let i=1;i<kl.length;i++)tr.push(Math.max(kl[i].h-kl[i].l,Math.abs(kl[i].h-kl[i-1].c),Math.abs(kl[i].l-kl[i-1].c)));
-  let a=tr.slice(0,p).reduce((x,y)=>x+y,0)/p;
-  for(let i=p;i<tr.length;i++)a=(a*(p-1)+tr[i])/p;
-  return a;
+if(!kl||kl.length<p+1)return 0;
+let tr=[];
+for(let i=1;i<kl.length;i++)tr.push(Math.max(kl[i].h-kl[i].l,Math.abs(kl[i].h-kl[i-1].c),Math.abs(kl[i].l-kl[i-1].c)));
+let a=tr.slice(0,p).reduce((x,y)=>x+y,0)/p;
+for(let i=p;i<tr.length;i++)a=(a*(p-1)+tr[i])/p;
+return a;
 }
 function volRatio(kl){
-  if(!kl||kl.length<20)return 1;
-  let v=kl.map(k=>k.v),avg=v.slice(-20).reduce((x,y)=>x+y,0)/20;
-  return avg===0?1:v.at(-1)/avg;
+if(!kl||kl.length<20)return 1;
+let v=kl.map(k=>k.v),avg=v.slice(-20).reduce((x,y)=>x+y,0)/20;
+return avg===0?1:v.at(-1)/avg;
 }
 function ema(arr,p){
-  if(!arr||arr.length===0)return 0;
-  if(arr.length<p)return arr[arr.length-1]||0;
-  const k=2/(p+1);let e=arr.slice(0,p).reduce((a,b)=>a+b,0)/p;
-  for(let i=p;i<arr.length;i++)e=arr[i]*k+e*(1-k);
-  return e;
+if(!arr||arr.length===0)return 0;
+if(arr.length<p)return arr[arr.length-1]||0;
+const k=2/(p+1);let e=arr.slice(0,p).reduce((a,b)=>a+b,0)/p;
+for(let i=p;i<arr.length;i++)e=arr[i]*k+e*(1-k);return e;
 }
 
 // ================= STRATEGY =================
 function getStrat(ap,r,v,c,tf){
-  if(!c||c.length<30)return'NEUTRAL';
-  let e9=ema(c.slice(-30),9),e21=ema(c.slice(-30),21);
-  let last=c.at(-1),p5=c[c.length-5],p10=c[c.length-10];
-  let m5=((last-p5)/p5)*100,m10=((last-p10)/p10)*100;
-  let diff=((e9-e21)/e21)*100;
-  let prevE9=ema(c.slice(-35,-5),9),prevE21=ema(c.slice(-35,-5),21);
-  let prevDiff=((prevE9-prevE21)/prevE21)*100;
-  let expanding=diff>prevDiff*0.95;
-  let thr=tf==='4H'?1.8:0.8,rsiT=tf==='4H'?48:45;
-  if((m10>thr||m5>thr*0.5)&&r>rsiT&&v>0.6&&expanding&&diff>-0.1)return'MOMENTUM';
-  if(last>e9&&e9>e21&&r>50&&m5>0.3&&diff>-0.2)return'CONTINUATION';
-  if((m10>thr*0.2||m5>thr*0.15)&&r>40&&diff>-0.5)return'SWING';
-  if(ap<3.0)return'GRID';  return'NEUTRAL';
+if(!c||c.length<30)return'NEUTRAL';
+let e9=ema(c.slice(-30),9),e21=ema(c.slice(-30),21);
+let last=c.at(-1),p5=c[c.length-5],p10=c[c.length-10];
+let m5=((last-p5)/p5)*100,m10=((last-p10)/p10)*100;
+let diff=((e9-e21)/e21)*100;
+let prevE9=ema(c.slice(-35,-5),9),prevE21=ema(c.slice(-35,-5),21);
+let prevDiff=((prevE9-prevE21)/prevE21)*100;
+let expanding=diff>prevDiff*0.95;
+let thr=tf==='4H'?1.8:0.8,rsiT=tf==='4H'?48:45;
+if((m10>thr||m5>thr*0.5)&&r>rsiT&&v>0.6&&expanding&&diff>-0.1)return'MOMENTUM';
+if(last>e9&&e9>e21&&r>50&&m5>0.3&&diff>-0.2)return'CONTINUATION';
+if((m10>thr*0.2||m5>thr*0.15)&&r>40&&diff>-0.5)return'SWING';
+if(ap<3.0)return'GRID';
+return'NEUTRAL';
 }
 function merge(s1,s2){
-  if(s1===s2)return s1+' ';
-  if(s1==='MOMENTUM'||s2==='MOMENTUM')return'MOMENTUM';
-  if(s1==='CONTINUATION'||s2==='CONTINUATION')return'CONTINUATION';
-  if(s1==='SWING'||s2==='SWING')return'SWING';
-  if(s1==='GRID'||s2==='GRID')return'GRID';
-  return'NEUTRAL';
+if(s1===s2)return s1;
+if(s1==='MOMENTUM'||s2==='MOMENTUM')return'MOMENTUM';
+if(s1==='CONTINUATION'||s2==='CONTINUATION')return'CONTINUATION';
+if(s1==='SWING'||s2==='SWING')return'SWING';
+if(s1==='GRID'||s2==='GRID')return'GRID';
+return'NEUTRAL';
 }
 function whaleFilter(v1,v4,ap4,price,ema21_4){return(v1>1.2||v4>1.2)&&ap4>1.2&&price>ema21_4*0.99;}
 function score(str,r1,r4,v1,v4){
-  let s=0;
-  if(str.includes('MOMENTUM'))s+=50;else if(str.includes('CONTINUATION'))s+=45;else if(str.includes('SWING'))s+=35;else s+=20;
-  if(str.includes('⚡'))s+=15;
-  if((r1>45&&r1<75)&&(r4>45&&r4<75))s+=15;
-  if(v1>0.8&&v4>0.7)s+=10;
-  return s;
+let s=0;
+if(str.includes('MOMENTUM'))s+=50;else if(str.includes('CONTINUATION'))s+=45;else if(str.includes('SWING'))s+=35;else s+=20;
+if(str.includes('⚡'))s+=15;
+if((r1>45&&r1<75)&&(r4>45&&r4<75))s+=15;
+if(v1>0.8&&v4>0.7)s+=10;
+return s;
 }
+
+// === Leverage Suggestion (text-based, no new CSS) ===
+function getLeverageSuggestion(sym,strategy,regime,ap4,beta){
+if(regime==="RISK_OFF")return"x2 DEFENSIVE";
+if(strategy==="MOMENTUM"){
+if(ap4>5&&beta>3)return"x3 AGGRESSIVE";
+return"x4 BALANCED";
+}
+if(strategy==="CONTINUATION")return"x3 TREND";
+if(strategy==="SWING")return"x2 CONSERVATIVE";
+return"x1 GRID";
+}
+// === Portfolio Heat Control ===
+function isSectorOverlimit(sym,strategy){
+const sector=getSector(sym);
+const limit=SECTOR_LIMITS[sector]||1;
+const count=[...activeTrades.values()].filter(t=>t.sector===sector&&t.strategy===strategy).length;
+return count>=limit;
+}
+function isStratOverlimit(strategy){
+const limit=STRAT_LIMITS[strategy]||3;
+const count=[...activeTrades.values()].filter(t=>t.strategy===strategy).length;
+return count>=limit;
+}
+function recordActiveTrade(sym,strategy){
+const sector=getSector(sym);
+activeTrades.set(sym,{sector,strategy,timestamp:Date.now()});
+const now=Date.now();
+for(const[k,v]of activeTrades.entries()){
+if((now-v.timestamp)>(4*60*60*1000))activeTrades.delete(k);
+}
+}
+
 function calculateRisk(entry,stop,tp1,balance=accountBalance,riskPct=riskPerTrade){
-  if(!entry||!stop||!tp1)return null;
-  let riskUSD=balance*riskPct,stopDist=Math.abs(entry-stop)/entry;
-  if(stopDist<=0.001)return null;
-  let positionSize=riskUSD/stopDist,rewardPct=((tp1-entry)/entry)*100;
-  let rr=(entry!==stop)?(tp1-entry)/(entry-stop):0;
-  return{riskUSD:riskUSD.toFixed(2),size:positionSize.toFixed(2),stopPct:(stopDist*100).toFixed(2)+'%',reward1:rewardPct.toFixed(1)+'%',rr:rr.toFixed(2)};
+if(!entry||!stop||!tp1)return null;
+let riskUSD=balance*riskPct,stopDist=Math.abs(entry-stop)/entry;
+if(stopDist<=0.001)return null;
+let positionSize=riskUSD/stopDist,rewardPct=((tp1-entry)/entry)*100;
+let rr=(entry!==stop)?(tp1-entry)/(entry-stop):0;
+return{riskUSD:riskUSD.toFixed(2),size:positionSize.toFixed(2),stopPct:(stopDist*100).toFixed(2)+'%',reward1:rewardPct.toFixed(1)+'%',rr:rr.toFixed(2)};
 }
 
 // ================= LEVELS & GRID =================
 function getLevels(c,price,atr,e9,e21,btcWeather=null,sym=""){
-  if(!c||c.length<20)return{pullback:price,stop:price*0.95,tp1:price*1.05};
-  let lo=Math.min(...c.slice(-20)),hi=Math.max(...c.slice(-20));
-  let basePull=Math.max(lo*1.01,e9),regimeDiscount=0;
-  if(btcWeather&&btcWeather.sentiment==='BEARISH'){
-    let btcDrop=Math.abs(btcWeather.priceChangePct||0);
-    if(btcDrop>=2.0){let beta=getCoinBeta(sym),adj=Math.min(beta,5)+Math.log(Math.max(beta,1));regimeDiscount=Math.min(btcDrop*adj*0.4,10)/100;}
-  }
-  return{pullback:basePull*(1-regimeDiscount),basePullback:basePull,stop:e21*0.97,tp1:hi,tp2:price+(atr*3)};
+if(!c||c.length<20)return{pullback:price,stop:price*0.95,tp1:price*1.05};
+let lo=Math.min(...c.slice(-20)),hi=Math.max(...c.slice(-20));
+let basePull=Math.max(lo*1.01,e9),regimeDiscount=0;
+if(btcWeather&&btcWeather.sentiment==='BEARISH'){
+let btcDrop=Math.abs(btcWeather.priceChangePct||0);
+if(btcDrop>=2.0){let beta=getCoinBeta(sym),adj=Math.min(beta,5)+Math.log(Math.max(beta,1));regimeDiscount=Math.min(btcDrop*adj*0.4,10)/100;}
+}
+return{pullback:basePull*(1-regimeDiscount),basePullback:basePull,stop:e21*0.97,tp1:hi,tp2:price+(atr*3)};
 }
 function gridLvl(price,ap){let step=price*(ap/100)*1.2,n=ap<2?12:ap<4?10:8;return{low:price-(step*n),high:price+(step*n),step,n};}
 function buildGridLevels(low,high,n){let levels=[],range=high-low;for(let i=0;i<=n;i++){let factor=Math.pow(i/n,1.2);levels.push((low+range*factor).toFixed(4));}return levels;}
 
 // ================= REGIME & TP ENGINE =================
 async function getBTCWeather(){
-  try{
-    const k4=await safeGetKlines('BTCUSDT','linear','240');
-    if(!k4.length)return null;
-    const c4=k4.map(k=>k.c),price=c4[c4.length-2],startPrice=c4[c4.length-6];
-    const pct=((price-startPrice)/startPrice)*100;
-    let sentiment='NEUTRAL',color='#ffcc00',advice='Wait for confirmation';    if(pct<=-2.0){sentiment='BEARISH';color='#ff5555';advice='🔴 DUMP: Wick-hunt only';}
-    else if(pct>=0.5){sentiment='BULLISH';color='#00ff99';advice='🟢 RECOVERY: Momentum breakouts';}
-    return{price,priceChangePct:pct,sentiment,color,advice};
-  }catch(e){return null;}
+try{
+const k4=await safeGetKlines('BTCUSDT','linear','240');
+if(!k4.length)return null;
+const c4=k4.map(k=>k.c),price=c4[c4.length-2],startPrice=c4[c4.length-6];const pct=((price-startPrice)/startPrice)*100;
+let sentiment='NEUTRAL',color='#ffcc00',advice='Wait for confirmation';
+if(pct<=-2.0){sentiment='BEARISH';color='#ff5555';advice='🔴 DUMP: Wick-hunt only';}
+else if(pct>=0.5){sentiment='BULLISH';color='#00ff99';advice='🟢 RECOVERY: Momentum breakouts';}
+return{price,priceChangePct:pct,sentiment,color,advice};
+}catch(e){return null;}
 }
 function getMarketRegime(btcWeather){
-  if(!btcWeather)return"CHOP";
-  const pct=btcWeather.priceChangePct||0;
-  if(btcWeather.sentiment==="BEARISH"&&pct<=-2.0)return"RISK_OFF";
-  if(Math.abs(pct)<0.8)return"CHOP";
-  if(btcWeather.sentiment==="BULLISH"||pct>0.8)return"BULL";
-  return"CHOP";
+if(!btcWeather)return"CHOP";
+const pct=btcWeather.priceChangePct||0;
+if(btcWeather.sentiment==="BEARISH"&&pct<=-2.0)return"RISK_OFF";
+if(Math.abs(pct)<0.8)return"CHOP";
+if(btcWeather.sentiment==="BULLISH"||pct>0.8)return"BULL";
+return"CHOP";
 }
 function applyRegimeFilter(regime,strategy,ap4,v4,r4,sc){
-  if(regime==="RISK_OFF"){
-    if(strategy.includes("MOMENTUM"))return ap4>3.5&&v4>1.3&&r4>55&&sc>55;
-    if(strategy.includes("CONTINUATION"))return sc>45;
-    return strategy.includes("SWING");
-  }
-  if(regime==="CHOP"){
-    if(strategy.includes("MOMENTUM"))return false;
-    if(strategy.includes("CONTINUATION"))return true;
-    return strategy.includes("SWING");
-  }
-  return true;
+if(regime==="RISK_OFF"){
+if(strategy.includes("MOMENTUM"))return ap4>3.5&&v4>1.3&&r4>55&&sc>55;
+if(strategy.includes("CONTINUATION"))return sc>45;
+return strategy.includes("SWING");
+}
+if(regime==="CHOP"){
+if(strategy.includes("MOMENTUM"))return false;
+if(strategy.includes("CONTINUATION"))return true;
+return strategy.includes("SWING");
+}
+return true;
 }
 function getTPClass(ap4,vol,strategy,regime){
-  if(regime==="RISK_OFF")return 5;
-  if(regime==="CHOP"){if(strategy.includes("SWING"))return 5;if(strategy.includes("CONTINUATION"))return 10;return 10;}
-  if(regime==="BULL"){
-    if(strategy.includes("MOMENTUM")){if(ap4>=6&&vol>=1.5)return 20;return 15;}
-    if(strategy.includes("CONTINUATION")){if(ap4>=4)return 15;return 10;}
-    return 10;
-  }
-  return 5;
+if(regime==="RISK_OFF")return 5;
+if(regime==="CHOP"){if(strategy.includes("SWING"))return 5;if(strategy.includes("CONTINUATION"))return 10;return 10;}
+if(regime==="BULL"){
+if(strategy.includes("MOMENTUM")){if(ap4>=6&&vol>=1.5)return 20;return 15;}
+if(strategy.includes("CONTINUATION")){if(ap4>=4)return 15;return 10;}
+return 10;
+}
+return 5;
 }
 function getAutoTP(entry,regime,ap4=0,v4=1,strategy="SWING"){
-  let tp1=entry*1.05,tp2=entry*1.10;
-  if(regime==="RISK_OFF")return{tp1:entry*1.03,tp2:entry*1.05,note:"SCALP MODE"};
-  if(regime==="CHOP")return{tp1:entry*1.05,tp2:entry*1.08,note:"RANGE MODE"};
-  if(regime==="BULL"){
-    if(strategy.includes("MOMENTUM")&&ap4>3&&v4>1.2){tp1=entry*1.08;tp2=entry*1.15;}
-    else if(strategy.includes("CONTINUATION")){tp1=entry*1.05;tp2=entry*1.10;}
-    else{tp1=entry*1.04;tp2=entry*1.08;}
-    return{tp1,tp2,note:"TREND MODE"};
-  }
-  return{tp1,tp2,note:"DEFAULT"};
+let tp1=entry*1.05,tp2=entry*1.10;
+if(regime==="RISK_OFF")return{tp1:entry*1.03,tp2:entry*1.05,note:"SCALP MODE"};
+if(regime==="CHOP")return{tp1:entry*1.05,tp2:entry*1.08,note:"RANGE MODE"};
+if(regime==="BULL"){
+if(strategy.includes("MOMENTUM")&&ap4>3&&v4>1.2){tp1=entry*1.08;tp2=entry*1.15;}
+else if(strategy.includes("CONTINUATION")){tp1=entry*1.05;tp2=entry*1.10;}
+else{tp1=entry*1.04;tp2=entry*1.08;}
+return{tp1,tp2,note:"TREND MODE"};
 }
-function getExitPlan(tp1,tp2){return{exit1:"SELL 50% @ TP1",exit2:"SELL 50% @ TP2",trailing:"Move SL to BE after TP1 hit",tp1,tp2};}
+return{tp1,tp2,note:"DEFAULT"};
+}function getExitPlan(tp1,tp2){return{exit1:"SELL 50% @ TP1",exit2:"SELL 50% @ TP2",trailing:"Move SL to BE after TP1 hit",tp1,tp2};}
+
 // ================= 🚫 ANTI-REENTRY & QUALITY FILTERS =================
 function isWeakReEntry(r4,v4,ap4,strategy){
-  if(!strategy.includes('SWING')){
-    if(r4<45&&v4<0.9&&ap4<2.0)return true;
-  }
-  return false;
+if(!strategy.includes('SWING')){
+if(r4<45&&v4<0.9&&ap4<2.0)return true;
+}
+return false;
 }
 function checkReEntryBlock(sym,currentCandleTime){
-  if(recentSetups.has(sym)){
-    const last=recentSetups.get(sym);
-    const diff=(currentCandleTime-last.t)/(4*60*60*1000);
-    if(diff<REENTRY_BLOCK_CANDLES){
-      if(last.r4>=currentR4||last.v4>=currentV4)return true;
-    }
-  }
-  return false;
+if(recentSetups.has(sym)){
+const last=recentSetups.get(sym);
+const diff=(currentCandleTime-last.t)/(4*60*60*1000);
+if(diff<REENTRY_BLOCK_CANDLES){
+if(last.r4>=currentR4||last.v4>=currentV4)return true;
+}
+}
+return false;
 }
 function recordSetup(sym,t,r4,v4){
-  recentSetups.set(sym,{t,r4,v4});
-  const now=Date.now();
-  for(const[k,v]of recentSetups.entries()){
-    if((now-v.t)>(24*60*60*1000))recentSetups.delete(k);
-  }
+recentSetups.set(sym,{t,r4,v4});
+const now=Date.now();
+for(const[k,v]of recentSetups.entries()){
+if((now-v.t)>(24*60*60*1000))recentSetups.delete(k);
+}
 }
 
 // ================= CORE PROCESSOR =================
 function processCoin(sym,k1,k4,mode,btcWeather,res){
-  let a1=calcATR(k1),a4=calcATR(k4);
-  let p1=k1.at(-1).c,p4=k4.at(-1).c;
-  let ap1=(a1/p1)*100,ap4=(a4/p4)*100;
-  if(mode==='CORE'){if(ap1<0.25&&ap4<0.25)return;}else{if(ap1<0.55&&ap4<0.55)return;}
-  if(ap1>15&&ap4>15)return;
-  let c1=k1.map(x=>x.c),c4=k4.map(x=>x.c);
-  let r1=calcRSI(c1),r4=calcRSI(c4),v1=volRatio(k1),v4=volRatio(k4);
-  let e9_1=ema(c1.slice(-20),9),e21_1=ema(c1.slice(-20),21);
-  let e9_4=ema(c4.slice(-20),9),e21_4=ema(c4.slice(-20),21);
-  const dollarVol=p4*k4.at(-1).v;
-  if(dollarVol<MIN_DOLLAR_VOL)return;
-  let s1=getStrat(ap1,r1,v1,c1,'1H'),s4=getStrat(ap4,r4,v4,c4,'4H');
-  let fin=merge(s1,s4);
-  const regime=getMarketRegime(btcWeather);
-  let sc=score(fin,r1,r4,v1,v4);
-  if(!applyRegimeFilter(regime,fin,ap4,v4,r4,sc))return;
-  
-  currentR4=r4;currentV4=v4;
-  if(checkReEntryBlock(sym,k4.at(-1).t))return;
-  if(isWeakReEntry(r4,v4,ap4,fin))return;
-  
-  if(mode==='CORE'){if(fin==='NEUTRAL')return;}
-  else if(mode==='SPOT'||mode==='FUTURES'){if(!fin.includes('SWING')&&!fin.includes('MOMENTUM')&&!fin.includes('CONTINUATION'))return;}  else if(mode==='GRID'){if(!fin.includes('GRID'))return;}
-  if(mode==='FUTURES'&&fin.includes('MOMENTUM')){if(!whaleFilter(v1,v4,ap4,p4,e21_4))return;if(sc<55)return;}
-  if(btcWeather?.sentiment==='BEARISH'&&fin.includes('MOMENTUM'))fin=fin.replace('MOMENTUM','SWING');
-  let noGrid=fin.includes('MOMENTUM');
-  if(btcWeather?.sentiment==='BEARISH'&&ap4>5)noGrid=true;
-  let lv=getLevels(c4,p4,a4,e9_4,e21_4,btcWeather,sym);
-  let entry=lv.pullback;
-  let tpData=getAutoTP(entry,regime,ap4,v4,fin);
-  let exitPlan=getExitPlan(tpData.tp1,tpData.tp2);
-  let gl=fin.includes('GRID')&&!noGrid?gridLvl(p4,ap4):null;
-  let risk=null;
-  if((fin.includes('SWING')||fin.includes('MOMENTUM')||fin.includes('CONTINUATION'))){
-    risk=calculateRisk(entry,lv.stop,tpData.tp1);
-    if(risk&&parseFloat(risk.rr)<minRR)return;
-  }
-  if(fin.includes('SWING')&&sc<42)return;
-  if(fin.includes('CONTINUATION')&&sc<42)return;
-  if(fin.includes('MOMENTUM')&&sc<50)return;
-  
-  recordSetup(sym,k4.at(-1).t,r4,v4);
-  res.push({sym,price:p4,s1,s4,fin,r1,r4,ap1,ap4,v1,v4,e9_1,e21_1,e9_4,e21_4,sc,lv,gl,noGrid,risk,rr:risk?parseFloat(risk.rr):0,entry:entry,tp1:tpData.tp1,tp2:tpData.tp2,exitPlan:exitPlan,regime:regime,tpNote:tpData.note});
+let a1=calcATR(k1),a4=calcATR(k4);
+let p1=k1.at(-1).c,p4=k4.at(-1).c;
+let ap1=(a1/p1)*100,ap4=(a4/p4)*100;
+if(mode==='CORE'){if(ap1<0.25&&ap4<0.25)return;}else{if(ap1<0.55&&ap4<0.55)return;}
+if(ap1>15&&ap4>15)return;
+let c1=k1.map(x=>x.c),c4=k4.map(x=>x.c);
+let r1=calcRSI(c1),r4=calcRSI(c4),v1=volRatio(k1),v4=volRatio(k4);
+let e9_1=ema(c1.slice(-20),9),e21_1=ema(c1.slice(-20),21);
+let e9_4=ema(c4.slice(-20),9),e21_4=ema(c4.slice(-20),21);
+const dollarVol=p4*k4.at(-1).v;
+if(dollarVol<MIN_DOLLAR_VOL)return;
+let s1=getStrat(ap1,r1,v1,c1,'1H'),s4=getStrat(ap4,r4,v4,c4,'4H');
+let fin=merge(s1,s4);
+const regime=getMarketRegime(btcWeather);
+let sc=score(fin,r1,r4,v1,v4);
+
+// === Strict Quality Gate ===
+if(sc < MIN_SCORE[fin]) return;
+if(r1<MIN_RSI||r1>MAX_RSI) return;
+if(v1<MIN_VOL_RATIO) return;
+if(!applyRegimeFilter(regime,fin,ap4,v4,r4,sc))return;
+
+currentR4=r4;currentV4=v4;
+if(checkReEntryBlock(sym,k4.at(-1).t))return;
+if(isWeakReEntry(r4,v4,ap4,fin))return;
+
+// === Portfolio Heat Control ===
+if(isSectorOverlimit(sym,fin)) return;
+if(isStratOverlimit(fin)) return;
+
+if(mode==='CORE'){if(fin==='NEUTRAL')return;}
+else if(mode==='SPOT'||mode==='FUTURES'){if(!fin.includes('SWING')&&!fin.includes('MOMENTUM')&&!fin.includes('CONTINUATION'))return;}
+else if(mode==='GRID'){if(!fin.includes('GRID'))return;}
+if(mode==='FUTURES'&&fin.includes('MOMENTUM')){if(!whaleFilter(v1,v4,ap4,p4,e21_4))return;if(sc<55)return;}
+if(btcWeather?.sentiment==='BEARISH'&&fin.includes('MOMENTUM'))fin=fin.replace('MOMENTUM','SWING');
+let noGrid=fin.includes('MOMENTUM');
+if(btcWeather?.sentiment==='BEARISH'&&ap4>5)noGrid=true;
+let lv=getLevels(c4,p4,a4,e9_4,e21_4,btcWeather,sym);
+let entry=lv.pullback;
+let tpData=getAutoTP(entry,regime,ap4,v4,fin);
+let exitPlan=getExitPlan(tpData.tp1,tpData.tp2);
+let gl=fin.includes('GRID')&&!noGrid?gridLvl(p4,ap4):null;
+let risk=null;
+if((fin.includes('SWING')||fin.includes('MOMENTUM')||fin.includes('CONTINUATION'))){
+risk=calculateRisk(entry,lv.stop,tpData.tp1);
+if(risk&&parseFloat(risk.rr)<minRR)return;
+}
+
+// === Leverage + Rank ===
+const beta=getCoinBeta(sym);
+const levSug=getLeverageSuggestion(sym,fin,regime,ap4,beta);
+const rank=RANK_LABELS[fin]||"5";
+
+recordSetup(sym,k4.at(-1).t,r4,v4);
+res.push({
+sym,price:p4,s1,s4,fin,r1,r4,ap1,ap4,v1,v4,e9_1,e21_1,e9_4,e21_4,sc,lv,gl,noGrid,risk,
+rr:risk?parseFloat(risk.rr):0,entry:entry,tp1:tpData.tp1,tp2:tpData.tp2,exitPlan:exitPlan,
+regime:regime,tpNote:tpData.note,levSug,rank
+});
 }
 
 // ================= MAIN SCAN =================
 async function scan(list,cat,mode='CORE'){
-  scanAbort=false;
-  let out=document.getElementById('out'),pbar=document.getElementById('pbar');
-  let stat=document.getElementById('status');
-  out.innerHTML='';pbar.style.width='0%';
-  stat.innerHTML=` Scanning ${mode} | ${list.length} coins...`;
-  const btcWeather=await getBTCWeather();
-  const regime=getMarketRegime(btcWeather);
-  let res=[],scannedCount=0,failedCount=0;
-  for(let i=0;i<list.length;i+=CHUNK_SIZE){
-    if(scanAbort)break;
-    const chunk=list.slice(i,i+CHUNK_SIZE);
-    await Promise.all(chunk.map(async(sym)=>{
-      if(scanAbort)return;
-      if((mode==='SPOT'||mode==='FUTURES')&&SLOW_COINS.has(sym))return;
-      try{
-        let[k1,k4]=await Promise.all([safeGetKlines(sym,cat,'60'),safeGetKlines(sym,cat,'240')]);
-        if(!k1?.length||!k4?.length){failedCount++;return;}
-        scannedCount++;
-        processCoin(sym,k1,k4,mode,btcWeather,res);
-      }catch(e){failedCount++;}
-    }));
-    let pct=Math.min(100,((i+CHUNK_SIZE)/list.length)*100);
-    pbar.style.width=pct+'%';
-    await new Promise(r=>setTimeout(r,CHUNK_DELAY));
-  }  res.sort((a,b)=>{if(b.sc!==a.sc)return b.sc-a.sc;return b.rr-a.rr;});
-  render(res.slice(0,MAX_DISPLAY),btcWeather,regime);
-  const rate=list.length>0?Math.round((scannedCount/list.length)*100):0;
-  if(res.length===0){
-    if(failedCount>list.length*0.5){stat.innerHTML=`❌ API ERROR | ${failedCount}/${list.length} failed • Try again`;}
-    else{stat.innerHTML=`⚠️ NO TRADEABLE SETUPS | ${regime} MODE | Scanned: ${scannedCount}/${list.length} (${rate}%)`;}
-  }else{stat.innerHTML=`✅ ${mode} | ${res.length} SETUP${res.length>1?'S':''} FOUND | ${regime}`;}
+scanAbort=false;
+let out=document.getElementById('out'),pbar=document.getElementById('pbar');
+let stat=document.getElementById('status');
+out.innerHTML='';pbar.style.width='0%';
+stat.innerHTML=`🔍 Scanning ${mode} | ${list.length} coins...`;
+const btcWeather=await getBTCWeather();
+const regime=getMarketRegime(btcWeather);let res=[],scannedCount=0,failedCount=0;
+for(let i=0;i<list.length;i+=CHUNK_SIZE){
+if(scanAbort)break;
+const chunk=list.slice(i,i+CHUNK_SIZE);
+await Promise.all(chunk.map(async(sym)=>{
+if(scanAbort)return;
+if((mode==='SPOT'||mode==='FUTURES')&&SLOW_COINS.has(sym))return;
+try{
+let[k1,k4]=await Promise.all([safeGetKlines(sym,cat,'60'),safeGetKlines(sym,cat,'240')]);
+if(!k1?.length||!k4?.length){failedCount++;return;}
+scannedCount++;
+processCoin(sym,k1,k4,mode,btcWeather,res);
+}catch(e){failedCount++;}
+}));
+let pct=Math.min(100,((i+CHUNK_SIZE)/list.length)*100);
+pbar.style.width=pct+'%';
+await new Promise(r=>setTimeout(r,CHUNK_DELAY));
+}
+
+// === Guarantee 3-5 HIGH QUALITY ===
+res.sort((a,b)=>{if(b.sc!==a.sc)return b.sc-a.sc;return b.rr-a.rr;});
+const qualified=res.slice(0,MAX_DISPLAY);
+
+render(qualified,btcWeather,regime);
+const rate=list.length>0?Math.round((scannedCount/list.length)*100):0;
+if(qualified.length===0){
+if(failedCount>list.length*0.5){stat.innerHTML=`❌ API ERROR | ${failedCount}/${list.length} failed • Try again`;}
+else{stat.innerHTML=`⚠️ NO HIGH-QUALITY SETUPS | ${regime} MODE | Scanned: ${scannedCount}/${list.length} (${rate}%)`;}
+}else{stat.innerHTML=`✅ ${mode} | ${qualified.length} HIGH-QUALITY SETUP${qualified.length>1?'S':''} | ${regime}`;}
 }
 
 // ================= RENDER =================
+function showToast(msg){
+const toast=document.createElement('div');
+toast.className='box';
+toast.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);color:#00ff99;z-index:9999;text-align:center;';
+toast.textContent=msg;
+document.body.appendChild(toast);
+setTimeout(()=>toast.remove(),2000);
+}
+
+function copyTicket(d){
+const ticket=`🚀 ${d.sym} • Rank #${d.rank} • ${d.fin}
+📥 Entry: ${d.entry.toFixed(4)}
+🎯 TP1: ${d.tp1.toFixed(4)} • TP2: ${d.tp2.toFixed(4)}
+🛑 Stop: ${d.lv.stop.toFixed(4)}
+💰 Risk: ${d.risk?.riskUSD||'N/A'} | RR: ${d.rr||'N/A'}
+📊 Regime: ${d.regime} • ${d.tpNote}
+⚡ Leverage: ${d.levSug}`;
+navigator.clipboard.writeText(ticket).then(()=>{showToast('✓ Trade ticket copied!');
+recordActiveTrade(d.sym,d.fin);
+});
+}
+
 function render(data,btcWeather,regime="CHOP"){
-  let el=document.getElementById('out'),weatherHTML='';
-  if(btcWeather){
-    const sign=btcWeather.priceChangePct>=0?'+':'';
-    weatherHTML=`<div class="card" style="border:2px solid ${btcWeather.color};margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:14px;color:#fff;">📊 BTC REGIME</strong><span style="background:${btcWeather.color};color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:12px;">${btcWeather.sentiment} • ${regime}</span></div><div style="margin-top:6px;font-size:12px;color:#7a8594;">Change: <span style="color:${btcWeather.priceChangePct>=0?'#00ff99':'#ff5555'}">${sign}${btcWeather.priceChangePct.toFixed(2)}%</span> | Price: ${btcWeather.price.toFixed(0)}</div><div style="margin-top:4px;font-size:11px;color:${btcWeather.color};">${btcWeather.advice}</div></div>`;
-  }
-  if(!data.length){el.innerHTML=weatherHTML+`<div class="card error">NO TRADEABLE SETUPS • ${regime} mode active</div>`;return;}
-  el.innerHTML=weatherHTML+data.map(d=>{
-    let bias=d.fin.includes('MOMENTUM')?'🟢 LONG BIAS (MOMENTUM)':d.fin.includes('CONTINUATION')?'🟢 LONG BIAS (CONTINUATION)':d.fin.includes('SWING')?'🟢 LONG BIAS (SWING)':'🟡 GRID RANGE';
-    let signal=d.noGrid?'':`<div class="box"><span style="color:#00ff99">📥 ENTRY:</span> ${d.entry.toFixed(4)}<br><span style="color:#ffcc00">🎯 TP1:</span> ${d.tp1.toFixed(4)}<br><span style="color:#00c2ff"> TP2:</span> ${d.tp2.toFixed(4)}<br><span style="color:#ff5555">🛑 STOP:</span> ${d.lv.stop.toFixed(4)}<br><span style="color:#7a8594;font-size:10px;margin-top:4px;display:block;">${d.exitPlan.exit1} • ${d.exitPlan.exit2}<br>${d.exitPlan.trailing}</span>${d.risk?`<br><span style="color:#ffcc00">💰 RISK: ${d.risk.riskUSD} | SIZE: ${d.risk.size}</span>`:''}</div>`;
-    return `<div class="card"><strong style="font-size:15px;">${d.sym}</strong> <span style="color:#00ff99;margin-left:5px;">${bias}</span><br><br><div class="tf1h">1H: ${d.s1} | RSI:${Math.round(d.r1)}</div><div class="tf4h">4H: ${d.s4} | RSI:${Math.round(d.r4)}</div><br>${signal}</div>`;
-  }).join('');
+let el=document.getElementById('out'),weatherHTML='';
+if(btcWeather){
+const sign=btcWeather.priceChangePct>=0?'+':'';
+weatherHTML=`<div class="card" style="border:2px solid ${btcWeather.color};margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:center;"><strong style="font-size:14px;color:#fff;">📊 BTC REGIME</strong><span style="background:${btcWeather.color};color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:12px;">${btcWeather.sentiment} • ${regime}</span></div><div style="margin-top:6px;font-size:12px;color:#7a8594;">Change: <span style="color:${btcWeather.priceChangePct>=0?'#00ff99':'#ff5555'}">${sign}${btcWeather.priceChangePct.toFixed(2)}%</span> | Price: ${btcWeather.price.toFixed(0)}</div><div style="margin-top:4px;font-size:11px;color:${btcWeather.color};">${btcWeather.advice}</div></div>`;
+}
+if(!data.length){el.innerHTML=weatherHTML+`<div class="card error">NO HIGH-QUALITY SETUPS • ${regime} mode active</div>`;return;}
+el.innerHTML=weatherHTML+data.map(d=>{
+let bias=d.fin.includes('MOMENTUM')?'🟢 LONG BIAS (MOMENTUM)':d.fin.includes('CONTINUATION')?'🟢 LONG BIAS (CONTINUATION)':d.fin.includes('SWING')?'🟢 LONG BIAS (SWING)':'🟡 GRID RANGE';
+let rankBadge=`<span style="color:${RANK_COLORS[d.rank]};font-weight:bold;font-size:13px;">🏆 #${d.rank}</span>`;
+let levText=`<span style="color:#ffcc00;font-size:11px;">⚡ ${d.levSug}</span>`;
+let signal=d.noGrid?'':`<div class="box"><span style="color:#00ff99">📥 ENTRY:</span> ${d.entry.toFixed(4)}<br><span style="color:#ffcc00">🎯 TP1:</span> ${d.tp1.toFixed(4)}<br><span style="color:#00c2ff"> TP2:</span> ${d.tp2.toFixed(4)}<br><span style="color:#ff5555">🛑 STOP:</span> ${d.lv.stop.toFixed(4)}<br><span style="color:#7a8594;font-size:10px;margin-top:4px;display:block;">${d.exitPlan.exit1} • ${d.exitPlan.exit2}<br>${d.exitPlan.trailing}</span>${d.risk?`<br><span style="color:#ffcc00">💰 RISK: ${d.risk.riskUSD} | SIZE: ${d.risk.size}</span>`:''}</div>`;
+return `<div class="card" style="border-left:4px solid ${RANK_COLORS[d.rank]}">
+<strong style="font-size:15px;">${d.sym}</strong> ${rankBadge} ${levText} <span style="color:#00ff99;margin-left:5px;">${bias}</span><br><br>
+<div class="tf1h">1H: ${d.s1} | RSI:${Math.round(d.r1)}</div>
+<div class="tf4h">4H: ${d.s4} | RSI:${Math.round(d.r4)}</div><br>
+${signal}
+<button class="grid" onclick="copyTicket(this.closest('.card').__data__)" style="margin-top:8px;width:100%;">🛒 BUY NOW (Copy Ticket)</button>
+</div>`;
+}).join('');
+document.querySelectorAll('.card').forEach((card,i)=>{if(data[i])card.__data__=data[i];});
 }
 
 // ================= BUTTONS =================
